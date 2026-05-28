@@ -86,6 +86,13 @@ mix of CJK text and full-width symbols. The loader should not assume UTF-8 only.
 
 See `docs/text-compatibility.md` for the encoding and localization strategy.
 
+## Display Translation
+
+ERAplay should optionally translate rendered output through configurable APIs,
+without rewriting source files or mutating runtime strings.
+
+See `docs/translation.md` for the display translation strategy.
+
 ## Compatibility Strategy
 
 ERAplay should keep two modes:

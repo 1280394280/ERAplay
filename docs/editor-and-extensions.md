@@ -39,6 +39,7 @@ Core editor features:
 - visual action/menu editor for common command layouts,
 - live preview runner using the same runtime as the player,
 - output-channel preview for `info`, `main`, `actions`, and `history`,
+- translation preview with original, translated, and bilingual modes,
 - save data inspector for debugging.
 
 ## Language Tooling
@@ -88,6 +89,7 @@ Potential extension points:
 - add project templates,
 - add diagnostics or lint rules,
 - add import/export tools.
+- add translation providers.
 
 ## Plugin Boundaries
 
