@@ -32,6 +32,34 @@ def load_project_config(root: str | Path) -> ProjectConfig:
         return ProjectConfig.from_dict(tomllib.load(file))
 
 
+def default_config_text(source_encoding: str = "utf-8") -> str:
+    return f"""[project]
+source_encoding = "{source_encoding}"
+
+[translation]
+enabled = false
+source_language = "auto"
+target_language = "zh-Hans"
+provider = "none"
+display_mode = "translated"
+translate_channels = ["info", "main", "actions"]
+"""
+
+
+def init_project_config(
+    root: str | Path,
+    source_encoding: str = "utf-8",
+    overwrite: bool = False,
+) -> Path:
+    root_path = Path(root)
+    root_path.mkdir(parents=True, exist_ok=True)
+    path = root_path / CONFIG_FILE_NAME
+    if path.exists() and not overwrite:
+        raise FileExistsError(path)
+    path.write_text(default_config_text(source_encoding), encoding="utf-8")
+    return path
+
+
 def _table(data: dict[str, object], key: str) -> dict[str, object]:
     value = data.get(key, {})
     if not isinstance(value, dict):

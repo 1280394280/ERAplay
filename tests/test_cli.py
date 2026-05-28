@@ -1,7 +1,7 @@
 from io import StringIO
 from pathlib import Path
 
-from eraplay.cli import check_project, list_symbols, main
+from eraplay.cli import check_project, init_project, list_symbols, main
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -43,8 +43,33 @@ def test_list_symbols_reports_indexed_symbols() -> None:
     assert "[define]" in text
     assert "DEFAULT_MONEY" in text
     assert "[csv_key]" in text
-    assert "タイトル" in text
+    assert "\u30bf\u30a4\u30c8\u30eb" in text
 
 
 def test_main_symbols_command() -> None:
     assert main(["symbols", str(ROOT / "fixtures")]) == 0
+
+
+def test_init_project_creates_config(tmp_path: Path) -> None:
+    out = StringIO()
+
+    exit_code = init_project(tmp_path, encoding="cp950", out=out)
+
+    assert exit_code == 0
+    assert (tmp_path / "eraplay.toml").exists()
+    assert "created" in out.getvalue()
+
+
+def test_init_project_refuses_existing_config(tmp_path: Path) -> None:
+    init_project(tmp_path)
+    out = StringIO()
+
+    exit_code = init_project(tmp_path, out=out)
+
+    assert exit_code == 1
+    assert "config already exists" in out.getvalue()
+
+
+def test_main_init_command(tmp_path: Path) -> None:
+    assert main(["init", str(tmp_path), "--encoding", "cp932"]) == 0
+    assert (tmp_path / "eraplay.toml").exists()

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TextIO
 
 from eraplay.analysis import analyze_project
+from eraplay.config import init_project_config
 from eraplay.index import SymbolKind, build_project_index
 from eraplay.project import load_project
 
@@ -68,6 +69,25 @@ def list_symbols(path: str | Path, encoding: str | None = None, out: TextIO | No
     return 0
 
 
+def init_project(
+    path: str | Path,
+    encoding: str = "utf-8",
+    overwrite: bool = False,
+    out: TextIO | None = None,
+) -> int:
+    if out is None:
+        out = sys.stdout
+
+    try:
+        config_path = init_project_config(path, source_encoding=encoding, overwrite=overwrite)
+    except FileExistsError as error:
+        print(f"config already exists: {error.filename}", file=out)
+        return 1
+
+    print(f"created {config_path}", file=out)
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="eraplay")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -87,6 +107,20 @@ def _build_parser() -> argparse.ArgumentParser:
         help="preferred source encoding, for example utf-8, cp932, cp950, or cp936",
     )
     symbols.set_defaults(handler=lambda args: list_symbols(args.path, args.encoding))
+
+    init = subparsers.add_parser("init", help="create an eraplay.toml project config")
+    init.add_argument("path", help="project directory to initialize")
+    init.add_argument(
+        "--encoding",
+        default="utf-8",
+        help="source encoding to write into eraplay.toml",
+    )
+    init.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite an existing eraplay.toml",
+    )
+    init.set_defaults(handler=lambda args: init_project(args.path, args.encoding, args.force))
     return parser
 
 

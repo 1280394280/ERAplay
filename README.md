@@ -45,6 +45,12 @@ enabled = false
 target_language = "zh-Hans"
 ```
 
+Create a project config:
+
+```powershell
+eraplay init D:\path\to\era-game --encoding cp932
+```
+
 ## Reference Sources
 
 The local sibling projects are used as references only:
