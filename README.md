@@ -6,6 +6,9 @@ The first goal is not full Emuera compatibility. The first goal is to build a
 clean parser and runtime core that can grow toward compatibility with real ERB,
 ERH, and CSV projects.
 
+The long-term goal is a creator-friendly ERA platform: player, runtime, editor,
+and extension system.
+
 ## Current Focus
 
 - Parse a practical ERB subset into a typed AST.

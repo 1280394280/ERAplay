@@ -2,6 +2,12 @@
 
 ERAplay is designed as a modern parser/runtime stack for ERA-style games.
 
+It should eventually support three product surfaces:
+
+- player: runs ERA/ERB games,
+- editor: creates, validates, previews, and packages games,
+- extension host: lets plugins add runtime and editor capabilities.
+
 ## Reference Map
 
 | Area | Primary Reference | Notes |
@@ -63,6 +69,14 @@ The runtime should emit output events that can be rendered into separate regions
 - `debug`
 
 See `docs/ui-model.md` for the target interface model.
+
+## Editor and Extension Direction
+
+The parser, diagnostics, symbol tables, output events, and runtime state should
+be treated as public internal APIs that an editor can consume. ERAplay should
+avoid burying important behavior in UI-specific code.
+
+See `docs/editor-and-extensions.md` for the creator tooling and plugin model.
 
 ## Compatibility Strategy
 
