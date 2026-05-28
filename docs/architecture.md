@@ -51,6 +51,19 @@ state and adapters
   variables, character data, saves, UI, resource IO
 ```
 
+## UI Direction
+
+ERAplay should not treat the UI as a single disposable console surface forever.
+The runtime should emit output events that can be rendered into separate regions:
+
+- `info`
+- `main`
+- `actions`
+- `history`
+- `debug`
+
+See `docs/ui-model.md` for the target interface model.
+
 ## Compatibility Strategy
 
 ERAplay should keep two modes:
