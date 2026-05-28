@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from eraplay.ast import Assignment, Call, Command, Label, Node, Return
+from eraplay.ast import Assignment, Call, Command, ElseBlock, EndIf, IfBlock, Label, Node, Return
 from eraplay.console import ClassicConsoleBuffer
 from eraplay.project import EraProject
 
@@ -48,9 +48,21 @@ class MiniRuntime:
             if isinstance(node, Return):
                 self.state.result = self._eval_value(node.expression) if node.expression else None
                 return self.state.result
-            self._execute_node(node)
-            index += 1
+            index = self._execute_at(nodes, index)
         return None
+
+    def _execute_at(self, nodes: tuple[Node, ...], index: int) -> int:
+        node = nodes[index]
+        if isinstance(node, IfBlock):
+            if self._eval_condition(node.condition):
+                return index + 1
+            return self._find_else_or_endif(nodes, index) + 1
+        if isinstance(node, ElseBlock):
+            return self._find_matching_endif(nodes, index) + 1
+        if isinstance(node, EndIf):
+            return index + 1
+        self._execute_node(node)
+        return index + 1
 
     def _execute_node(self, node: Node) -> None:
         if isinstance(node, Command):
@@ -89,6 +101,43 @@ class MiniRuntime:
             return total
         return self.state.variables.get(expression.upper(), 0)
 
+    def _eval_condition(self, expression: str) -> bool:
+        for operator in (">=", "<=", "==", "!=", ">", "<"):
+            if operator in expression:
+                left, right = expression.split(operator, 1)
+                left_value = self._eval_value(left)
+                right_value = self._eval_value(right)
+                return _compare_values(left_value, right_value, operator)
+        return bool(self._eval_value(expression))
+
+    @staticmethod
+    def _find_else_or_endif(nodes: tuple[Node, ...], index: int) -> int:
+        depth = 0
+        for cursor in range(index + 1, len(nodes)):
+            node = nodes[cursor]
+            if isinstance(node, IfBlock):
+                depth += 1
+            elif isinstance(node, EndIf):
+                if depth == 0:
+                    return cursor
+                depth -= 1
+            elif isinstance(node, ElseBlock) and depth == 0:
+                return cursor
+        return len(nodes) - 1
+
+    @staticmethod
+    def _find_matching_endif(nodes: tuple[Node, ...], index: int) -> int:
+        depth = 0
+        for cursor in range(index + 1, len(nodes)):
+            node = nodes[cursor]
+            if isinstance(node, IfBlock):
+                depth += 1
+            elif isinstance(node, EndIf):
+                if depth == 0:
+                    return cursor
+                depth -= 1
+        return len(nodes) - 1
+
     @staticmethod
     def _unquote(text: str) -> str:
         text = text.strip()
@@ -113,3 +162,26 @@ def run_project(project: EraProject, entry: str = "EVENTFIRST") -> RuntimeResult
 
 def _is_quoted(text: str) -> bool:
     return len(text) >= 2 and text[0] == '"' and text[-1] == '"'
+
+
+def _compare_values(left: int | str, right: int | str, operator: str) -> bool:
+    if isinstance(left, int) and isinstance(right, int):
+        left_value: int | str = left
+        right_value: int | str = right
+    else:
+        left_value = str(left)
+        right_value = str(right)
+
+    if operator == ">=":
+        return left_value >= right_value
+    if operator == "<=":
+        return left_value <= right_value
+    if operator == "==":
+        return left_value == right_value
+    if operator == "!=":
+        return left_value != right_value
+    if operator == ">":
+        return left_value > right_value
+    if operator == "<":
+        return left_value < right_value
+    raise RuntimeError(f"unsupported operator: {operator}")

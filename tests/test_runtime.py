@@ -50,3 +50,67 @@ LOCAL:1 = LOCAL + 1
 
     assert runtime.state.variables["LOCAL"] == 10
     assert runtime.state.variables["LOCAL:1"] == 11
+
+
+def test_runtime_executes_if_true_branch(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+FLAG:1 = 1
+IF FLAG:1 > 0
+PRINTL "on"
+ELSE
+PRINTL "off"
+ENDIF
+PRINTL "done"
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+
+    result = run_project(project)
+
+    assert result.console.visible_text() == "on\ndone"
+
+
+def test_runtime_executes_else_branch(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+FLAG:1 = 0
+IF FLAG:1 > 0
+PRINTL "on"
+ELSE
+PRINTL "off"
+ENDIF
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+
+    result = run_project(project)
+
+    assert result.console.visible_text() == "off"
+
+
+def test_runtime_executes_nested_if(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+A = 1
+B = 2
+IF A > 0
+IF B > 1
+PRINTL "nested"
+ENDIF
+ELSE
+PRINTL "wrong"
+ENDIF
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+
+    result = run_project(project)
+
+    assert result.console.visible_text() == "nested"
