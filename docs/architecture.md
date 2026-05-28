@@ -119,6 +119,19 @@ After loading, ERAplay builds a lightweight symbol index:
 The index is the first step toward editor features like autocomplete, jump to
 definition, references, rename, and project-wide diagnostics.
 
+## Project Diagnostics
+
+The analyzer uses the project and symbol index to produce editor-facing
+diagnostics. The first checks are intentionally conservative:
+
+- duplicate labels,
+- unresolved `CALL` targets,
+- empty ERH declarations,
+- empty CSV keys.
+
+These diagnostics are meant to become the same messages shown by the future
+editor and command-line project checker.
+
 ## Compatibility Strategy
 
 ERAplay should keep two modes:

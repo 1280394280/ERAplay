@@ -34,13 +34,13 @@ def parse_erh_source(source: str, filename: str = "<memory>") -> ErhDocument:
     for line in iter_logical_lines(source, filename):
         text = line.text
         upper = text.upper()
-        if upper.startswith("#DEFINE "):
+        if upper == "#DEFINE" or upper.startswith("#DEFINE "):
             name, value = _split_name_value(text[8:].strip())
             defines.append(ErhDefine(name, value, filename, line.span.line))
-        elif upper.startswith("#DIM "):
+        elif upper == "#DIM" or upper.startswith("#DIM "):
             name, args = _split_dim(text[5:].strip())
             dims.append(ErhDim(name, False, args, filename, line.span.line))
-        elif upper.startswith("#DIMS "):
+        elif upper == "#DIMS" or upper.startswith("#DIMS "):
             name, args = _split_dim(text[6:].strip())
             dims.append(ErhDim(name, True, args, filename, line.span.line))
     return ErhDocument(tuple(defines), tuple(dims))
@@ -52,7 +52,7 @@ def _split_name_value(text: str) -> tuple[str, str]:
 
 
 def _split_dim(text: str) -> tuple[str, tuple[str, ...]]:
-    parts = [part.strip() for part in text.split(",") if part.strip()]
+    parts = [part.strip() for part in text.split(",")]
     if not parts:
         return "", ()
-    return parts[0], tuple(parts[1:])
+    return parts[0], tuple(part for part in parts[1:] if part)
