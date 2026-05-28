@@ -51,6 +51,12 @@ Create a project config:
 eraplay init D:\path\to\era-game --encoding cp932
 ```
 
+Run the current minimal runtime:
+
+```powershell
+eraplay run D:\work\py\ERAplay\fixtures --entry EVENTFIRST
+```
+
 ## Reference Sources
 
 The local sibling projects are used as references only:

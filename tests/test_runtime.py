@@ -1,0 +1,52 @@
+from pathlib import Path
+
+from eraplay.project import load_project
+from eraplay.runtime import MiniRuntime, run_project
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_runtime_prints_eventfirst_output() -> None:
+    project = load_project(ROOT / "fixtures")
+
+    result = run_project(project, "EVENTFIRST")
+
+    assert "hello" in result.console.visible_text()
+
+
+def test_runtime_calls_function_label(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+CALL GREET
+PRINTL "done"
+
+$GREET
+PRINTL "hello"
+RETURN 0
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+
+    result = run_project(project)
+
+    assert result.console.visible_text() == "hello\ndone"
+
+
+def test_runtime_assigns_simple_values(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+LOCAL = 10
+LOCAL:1 = LOCAL + 1
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+    runtime = MiniRuntime(project)
+
+    runtime.run()
+
+    assert runtime.state.variables["LOCAL"] == 10
+    assert runtime.state.variables["LOCAL:1"] == 11

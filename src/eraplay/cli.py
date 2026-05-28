@@ -9,6 +9,7 @@ from eraplay.analysis import analyze_project
 from eraplay.config import init_project_config
 from eraplay.index import SymbolKind, build_project_index
 from eraplay.project import load_project
+from eraplay.runtime import run_project
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -88,6 +89,23 @@ def init_project(
     return 0
 
 
+def run_entry(
+    path: str | Path,
+    entry: str = "EVENTFIRST",
+    encoding: str | None = None,
+    out: TextIO | None = None,
+) -> int:
+    if out is None:
+        out = sys.stdout
+
+    project = load_project(path, preferred_encoding=encoding)
+    result = run_project(project, entry)
+    text = result.console.visible_text()
+    if text:
+        print(text, file=out)
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="eraplay")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -121,6 +139,19 @@ def _build_parser() -> argparse.ArgumentParser:
         help="overwrite an existing eraplay.toml",
     )
     init.set_defaults(handler=lambda args: init_project(args.path, args.encoding, args.force))
+
+    run = subparsers.add_parser("run", help="run a minimal ERAplay entry label")
+    run.add_argument("path", help="project directory to run")
+    run.add_argument(
+        "--entry",
+        default="EVENTFIRST",
+        help="entry label to run",
+    )
+    run.add_argument(
+        "--encoding",
+        help="preferred source encoding, for example utf-8, cp932, cp950, or cp936",
+    )
+    run.set_defaults(handler=lambda args: run_entry(args.path, args.entry, args.encoding))
     return parser
 
 

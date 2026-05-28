@@ -141,6 +141,7 @@ The first CLI surface is:
 eraplay check <project>
 eraplay symbols <project>
 eraplay init <project>
+eraplay run <project>
 ```
 
 `check` loads the project, builds the index, runs diagnostics, and exits with
@@ -148,6 +149,13 @@ eraplay init <project>
 labels, variables, macros, and CSV keys for inspection.
 `init` creates an `eraplay.toml` file with source encoding and translation
 defaults.
+
+## Minimal Runtime
+
+The first runtime is deliberately tiny. It can execute labels, `PRINT`, `PRINTL`,
+`CALL`, `RETURN`, and simple assignments. It is not an Emuera-compatible runtime
+yet; it exists to prove the loader/parser/console stack can produce visible
+output from a project.
 
 ## Compatibility Strategy
 

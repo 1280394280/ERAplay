@@ -1,7 +1,7 @@
 from io import StringIO
 from pathlib import Path
 
-from eraplay.cli import check_project, init_project, list_symbols, main
+from eraplay.cli import check_project, init_project, list_symbols, main, run_entry
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -73,3 +73,12 @@ def test_init_project_refuses_existing_config(tmp_path: Path) -> None:
 def test_main_init_command(tmp_path: Path) -> None:
     assert main(["init", str(tmp_path), "--encoding", "cp932"]) == 0
     assert (tmp_path / "eraplay.toml").exists()
+
+
+def test_run_entry_prints_output() -> None:
+    out = StringIO()
+
+    exit_code = run_entry(ROOT / "fixtures", out=out)
+
+    assert exit_code == 0
+    assert "hello" in out.getvalue()
