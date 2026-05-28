@@ -1,7 +1,7 @@
 from io import StringIO
 from pathlib import Path
 
-from eraplay.cli import check_project, main
+from eraplay.cli import check_project, list_symbols, main
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -29,3 +29,22 @@ def test_check_project_reports_diagnostics(tmp_path: Path) -> None:
 
 def test_main_check_command() -> None:
     assert main(["check", str(ROOT / "fixtures")]) == 0
+
+
+def test_list_symbols_reports_indexed_symbols() -> None:
+    out = StringIO()
+
+    exit_code = list_symbols(ROOT / "fixtures", out=out)
+    text = out.getvalue()
+
+    assert exit_code == 0
+    assert "[label]" in text
+    assert "EVENTFIRST" in text
+    assert "[define]" in text
+    assert "DEFAULT_MONEY" in text
+    assert "[csv_key]" in text
+    assert "タイトル" in text
+
+
+def test_main_symbols_command() -> None:
+    assert main(["symbols", str(ROOT / "fixtures")]) == 0

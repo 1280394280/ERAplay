@@ -138,10 +138,12 @@ The first CLI surface is:
 
 ```text
 eraplay check <project>
+eraplay symbols <project>
 ```
 
-It loads the project, builds the index, runs diagnostics, and exits with `0` for
-success or `1` when diagnostics are found.
+`check` loads the project, builds the index, runs diagnostics, and exits with
+`0` for success or `1` when diagnostics are found. `symbols` prints the indexed
+labels, variables, macros, and CSV keys for inspection.
 
 ## Compatibility Strategy
 

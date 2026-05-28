@@ -28,6 +28,12 @@ Check a project directory:
 eraplay check D:\work\py\ERAplay\fixtures
 ```
 
+List indexed symbols:
+
+```powershell
+eraplay symbols D:\work\py\ERAplay\fixtures
+```
+
 ## Reference Sources
 
 The local sibling projects are used as references only:
