@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from eraplay.ast import Program
+from eraplay.config import ProjectConfig, load_project_config
 from eraplay.csvdata import CsvDocument, parse_csv_source
 from eraplay.erh import ErhDocument, parse_erh_source
 from eraplay.parser import parse_source
@@ -37,6 +38,7 @@ class LoadedCsv:
 @dataclass(frozen=True)
 class EraProject:
     root: Path
+    config: ProjectConfig
     erb_files: tuple[LoadedErb, ...]
     erh_files: tuple[LoadedErh, ...]
     csv_files: tuple[LoadedCsv, ...]
@@ -47,16 +49,18 @@ def load_project(
     preferred_encoding: str | None = None,
 ) -> EraProject:
     root_path = Path(root)
+    config = load_project_config(root_path)
+    encoding = preferred_encoding or config.source_encoding
     erb_files = tuple(
-        _load_erb(path, preferred_encoding) for path in _glob_case_insensitive(root_path, "*.erb")
+        _load_erb(path, encoding) for path in _glob_case_insensitive(root_path, "*.erb")
     )
     erh_files = tuple(
-        _load_erh(path, preferred_encoding) for path in _glob_case_insensitive(root_path, "*.erh")
+        _load_erh(path, encoding) for path in _glob_case_insensitive(root_path, "*.erh")
     )
     csv_files = tuple(
-        _load_csv(path, preferred_encoding) for path in _glob_case_insensitive(root_path, "*.csv")
+        _load_csv(path, encoding) for path in _glob_case_insensitive(root_path, "*.csv")
     )
-    return EraProject(root_path, erb_files, erh_files, csv_files)
+    return EraProject(root_path, config, erb_files, erh_files, csv_files)
 
 
 def _load_text(path: Path, preferred_encoding: str | None) -> LoadedTextFile:

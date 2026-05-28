@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_load_fixture_project() -> None:
     project = load_project(ROOT / "fixtures")
 
+    assert project.config.source_encoding == "utf-8"
     assert len(project.erb_files) == 5
     assert len(project.erh_files) == 2
     assert len(project.csv_files) == 2

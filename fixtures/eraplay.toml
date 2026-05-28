@@ -1,0 +1,10 @@
+[project]
+source_encoding = "utf-8"
+
+[translation]
+enabled = false
+source_language = "ja"
+target_language = "zh-Hans"
+provider = "none"
+display_mode = "bilingual"
+translate_channels = ["info", "main", "actions"]

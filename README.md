@@ -34,6 +34,17 @@ List indexed symbols:
 eraplay symbols D:\work\py\ERAplay\fixtures
 ```
 
+Project configuration lives in `eraplay.toml`:
+
+```toml
+[project]
+source_encoding = "utf-8"
+
+[translation]
+enabled = false
+target_language = "zh-Hans"
+```
+
 ## Reference Sources
 
 The local sibling projects are used as references only:

@@ -97,6 +97,7 @@ See `docs/translation.md` for the display translation strategy.
 
 The first project-level loader is intentionally small:
 
+- load `eraplay.toml` when present,
 - discover `.erb`, `.erh`, and `.csv` files,
 - decode text with the configured encoding strategy,
 - parse ERB files into AST programs,
