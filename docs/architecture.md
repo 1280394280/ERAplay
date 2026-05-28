@@ -1,0 +1,75 @@
+# ERAplay Architecture
+
+ERAplay is designed as a modern parser/runtime stack for ERA-style games.
+
+## Reference Map
+
+| Area | Primary Reference | Notes |
+| --- | --- | --- |
+| ERB loading | `emuera-source/Emuera/Runtime/Script/Loader/ErbLoader.cs` | File order, labels, preprocessing, syntax checks |
+| ERH loading | `emuera-source/Emuera/Runtime/Script/Loader/ErhLoader.cs` | `#DEFINE`, `#DIM`, `#DIMS`, user functions |
+| Lexing | `emuera-source/Emuera/Runtime/Script/Parser/LexicalAnalyzer.cs` | Compatibility-sensitive token rules |
+| Logical lines | `emuera-source/Emuera/Runtime/Script/Parser/LogicalLineParser.cs` | Labels, sharp lines, commands |
+| Expressions | `emuera-source/Emuera/Runtime/Script/Statements/Expression/ExpressionParser.cs` | Operators, calls, term reduction |
+| Variables | `emuera-source/Emuera/Runtime/Script/Statements/Variable` | Built-in variables, user variables, character data |
+| Runtime process | `emuera-source/Emuera/Runtime/Script/Process.cs` | Initialization, execution state, input/output |
+| Mobile/UI port | `uEmuera-source/Assets/Scripts` | Unity frontend and platform adaptation |
+| Modern JS UI/API | `era-electron-source/src/era/model` | Electron IPC, resource loading, JS-facing API |
+
+## Target Layers
+
+```text
+project files
+  CSV / ERH / ERB / assets / saves
+        |
+        v
+loader
+  file discovery, encoding, include order
+        |
+        v
+preprocessor
+  macros, header declarations, conditional blocks
+        |
+        v
+lexer
+  source text -> tokens
+        |
+        v
+parser
+  tokens/logical lines -> AST
+        |
+        v
+compiler
+  AST -> IR or bytecode
+        |
+        v
+runtime
+  VM, call stack, scheduler, input waits
+        |
+        v
+state and adapters
+  variables, character data, saves, UI, resource IO
+```
+
+## Compatibility Strategy
+
+ERAplay should keep two modes:
+
+- `modern`: predictable behavior, better diagnostics, stricter project layout.
+- `emuera`: behavior follows Emuera where real games rely on quirks.
+
+Each compatibility feature should have:
+
+- a small source sample,
+- a parser/runtime test,
+- a note pointing to the Emuera source location used as reference.
+
+## Milestones
+
+1. Parse labels, commands, assignments, `IF/ELSE/ENDIF`, and `CALL`.
+2. Load ERH declarations and simple `#DEFINE` macros.
+3. Load basic CSV tables into structured data.
+4. Execute a tiny demo game in a CLI frontend.
+5. Add diagnostics with file, line, and column spans.
+6. Add save/load for runtime state.
+7. Add a web or desktop frontend adapter.
