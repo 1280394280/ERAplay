@@ -106,6 +106,19 @@ The first project-level loader is intentionally small:
 This loader is not yet a full Emuera-compatible load order implementation. It is
 the foundation for diagnostics, fixtures, and editor project indexing.
 
+## Project Indexing
+
+After loading, ERAplay builds a lightweight symbol index:
+
+- labels from ERB files,
+- assigned variables from ERB files,
+- `#DEFINE` macros from ERH files,
+- `#DIM` and `#DIMS` declarations from ERH files,
+- CSV keys from static data files.
+
+The index is the first step toward editor features like autocomplete, jump to
+definition, references, rename, and project-wide diagnostics.
+
 ## Compatibility Strategy
 
 ERAplay should keep two modes:
