@@ -93,6 +93,19 @@ without rewriting source files or mutating runtime strings.
 
 See `docs/translation.md` for the display translation strategy.
 
+## Project Loading
+
+The first project-level loader is intentionally small:
+
+- discover `.erb`, `.erh`, and `.csv` files,
+- decode text with the configured encoding strategy,
+- parse ERB files into AST programs,
+- parse ERH files into declarations,
+- parse CSV files into key/value rows.
+
+This loader is not yet a full Emuera-compatible load order implementation. It is
+the foundation for diagnostics, fixtures, and editor project indexing.
+
 ## Compatibility Strategy
 
 ERAplay should keep two modes:
