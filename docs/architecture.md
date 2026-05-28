@@ -132,6 +132,17 @@ diagnostics. The first checks are intentionally conservative:
 These diagnostics are meant to become the same messages shown by the future
 editor and command-line project checker.
 
+## Command Line
+
+The first CLI surface is:
+
+```text
+eraplay check <project>
+```
+
+It loads the project, builds the index, runs diagnostics, and exits with `0` for
+success or `1` when diagnostics are found.
+
 ## Compatibility Strategy
 
 ERAplay should keep two modes:

@@ -1,0 +1,62 @@
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+from typing import TextIO
+
+from eraplay.analysis import analyze_project
+from eraplay.index import build_project_index
+from eraplay.project import load_project
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+    return args.handler(args)
+
+
+def check_project(path: str | Path, encoding: str | None = None, out: TextIO | None = None) -> int:
+    if out is None:
+        import sys
+
+        out = sys.stdout
+
+    project = load_project(path, preferred_encoding=encoding)
+    index = build_project_index(project)
+    diagnostics = analyze_project(project, index)
+
+    if not diagnostics:
+        print(
+            f"OK: {project.root} "
+            f"({len(project.erb_files)} ERB, {len(project.erh_files)} ERH, {len(project.csv_files)} CSV)",
+            file=out,
+        )
+        return 0
+
+    for diagnostic in diagnostics:
+        span = diagnostic.span
+        print(
+            f"{span.file}:{span.line}:{span.column}: "
+            f"{diagnostic.severity}: {diagnostic.message}",
+            file=out,
+        )
+    print(f"{len(diagnostics)} diagnostic(s)", file=out)
+    return 1
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="eraplay")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    check = subparsers.add_parser("check", help="load and diagnose an ERA project")
+    check.add_argument("path", help="project directory to check")
+    check.add_argument(
+        "--encoding",
+        help="preferred source encoding, for example utf-8, cp932, cp950, or cp936",
+    )
+    check.set_defaults(handler=lambda args: check_project(args.path, args.encoding))
+    return parser
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

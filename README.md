@@ -22,6 +22,12 @@ and extension system.
 python -m pytest
 ```
 
+Check a project directory:
+
+```powershell
+eraplay check D:\work\py\ERAplay\fixtures
+```
+
 ## Reference Sources
 
 The local sibling projects are used as references only:
