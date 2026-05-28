@@ -21,6 +21,7 @@ It should eventually support three product surfaces:
 | Runtime process | `emuera-source/Emuera/Runtime/Script/Process.cs` | Initialization, execution state, input/output |
 | Mobile/UI port | `uEmuera-source/Assets/Scripts` | Unity frontend and platform adaptation |
 | Modern JS UI/API | `era-electron-source/src/era/model` | Electron IPC, resource loading, JS-facing API |
+| Encoding/text IO | `emuera-source/Emuera/Runtime/Utils/EncodingHandler.cs` and `EraStreamReader.cs` | Japanese and CJK legacy encoding behavior |
 
 ## Target Layers
 
@@ -77,6 +78,13 @@ be treated as public internal APIs that an editor can consume. ERAplay should
 avoid burying important behavior in UI-specific code.
 
 See `docs/editor-and-extensions.md` for the creator tooling and plugin model.
+
+## Text Compatibility
+
+Old ERA projects may be Japanese, Traditional Chinese, Simplified Chinese, or a
+mix of CJK text and full-width symbols. The loader should not assume UTF-8 only.
+
+See `docs/text-compatibility.md` for the encoding and localization strategy.
 
 ## Compatibility Strategy
 
