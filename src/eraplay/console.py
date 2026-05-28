@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
-from eraplay.ui import OutputChannel, OutputEvent, OutputKind
+from eraplay.ui import OutputChannel, OutputEvent, OutputKind, make_action
 
 
 @dataclass
@@ -57,7 +58,11 @@ class ClassicConsoleBuffer:
     def to_events(self) -> list[OutputEvent]:
         events: list[OutputEvent] = []
         for line in _trim_trailing_empty(self.current_lines):
-            events.append(OutputEvent(OutputChannel.MAIN, OutputKind.LINE, line))
+            action = _parse_action_line(line)
+            if action is not None:
+                events.append(action)
+            else:
+                events.append(OutputEvent(OutputChannel.MAIN, OutputKind.LINE, line))
         for line in _trim_trailing_empty(self.history_lines):
             events.append(OutputEvent(OutputChannel.HISTORY, OutputKind.LINE, line))
         return events
@@ -71,3 +76,10 @@ def _trim_trailing_empty(lines: list[str]) -> list[str]:
     while trimmed and trimmed[-1] == "":
         trimmed.pop()
     return trimmed
+
+
+def _parse_action_line(line: str) -> OutputEvent | None:
+    match = re.match(r"^\[(\d+)]\s*(.+)$", line.strip())
+    if match is None:
+        return None
+    return make_action(match.group(1), match.group(2))

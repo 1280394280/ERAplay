@@ -114,3 +114,40 @@ ENDIF
     result = run_project(project)
 
     assert result.console.visible_text() == "nested"
+
+
+def test_runtime_stops_at_input(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+PRINTL "[1] 通常業務"
+INPUT
+PRINTL "after input"
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+
+    result = run_project(project)
+
+    assert result.state.waiting_for_input is True
+    assert result.console.visible_text() == "[1] 通常業務"
+
+
+def test_runtime_input_output_can_be_classified_as_action(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+PRINTL "[95] 思考一下"
+INPUT
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+
+    result = run_project(project)
+    events = result.console.to_events()
+
+    assert events[0].channel.value == "actions"
+    assert events[0].choice_id == "95"
+    assert events[0].text == "思考一下"

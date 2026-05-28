@@ -1,5 +1,5 @@
 from eraplay.console import ClassicConsoleBuffer
-from eraplay.ui import OutputChannel
+from eraplay.ui import OutputChannel, OutputKind
 
 
 def test_classic_console_print_and_line() -> None:
@@ -47,3 +47,16 @@ def test_classic_console_clear_lines_moves_removed_lines_to_history() -> None:
 
     assert console.visible_text() == "line 1"
     assert console.history_text() == "line 2"
+
+
+def test_classic_console_classifies_action_lines() -> None:
+    console = ClassicConsoleBuffer()
+
+    console.print_line("[95] 思考一下")
+
+    events = console.to_events()
+
+    assert events[0].channel is OutputChannel.ACTIONS
+    assert events[0].kind is OutputKind.ACTION
+    assert events[0].choice_id == "95"
+    assert events[0].text == "思考一下"

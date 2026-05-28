@@ -89,6 +89,9 @@ ERAplay currently starts this idea with a `ClassicConsoleBuffer`: a small virtua
 console that keeps `current_lines` and `history_lines` separate. This gives the
 runtime a compatibility path before smarter UI classification exists.
 
+The first classifier recognizes simple action lines shaped like `[95] 思考一下`
+and emits `actions` events with `choice_id = "95"`.
+
 New ERAplay-native scripts can use explicit APIs later, for example:
 
 ```erb

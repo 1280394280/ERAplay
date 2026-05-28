@@ -12,6 +12,7 @@ from eraplay.project import EraProject
 class RuntimeState:
     variables: dict[str, int | str] = field(default_factory=dict)
     result: int | str | None = None
+    waiting_for_input: bool = False
 
 
 @dataclass
@@ -42,6 +43,8 @@ class MiniRuntime:
         nodes, start = self.labels[key]
         index = start + 1
         while index < len(nodes):
+            if self.state.waiting_for_input:
+                break
             node = nodes[index]
             if isinstance(node, Label):
                 break
@@ -83,6 +86,7 @@ class MiniRuntime:
         elif command.name == "CLEAR":
             self.console.clear()
         elif command.name == "INPUT":
+            self.state.waiting_for_input = True
             return
 
     def _eval_value(self, expression: str | None) -> int | str:
