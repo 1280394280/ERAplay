@@ -15,6 +15,7 @@ class NodeKind(str, Enum):
     LABEL = "label"
     COMMAND = "command"
     ASSIGNMENT = "assignment"
+    RETURN = "return"
     IF = "if"
     ELSE = "else"
     ENDIF = "endif"
@@ -60,6 +61,16 @@ class Assignment(Node):
         object.__setattr__(self, "kind", NodeKind.ASSIGNMENT)
         object.__setattr__(self, "span", span)
         object.__setattr__(self, "target", target)
+        object.__setattr__(self, "expression", expression)
+
+
+@dataclass(frozen=True)
+class Return(Node):
+    expression: str | None = None
+
+    def __init__(self, span: SourceSpan, expression: str | None = None) -> None:
+        object.__setattr__(self, "kind", NodeKind.RETURN)
+        object.__setattr__(self, "span", span)
         object.__setattr__(self, "expression", expression)
 
 

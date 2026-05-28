@@ -85,6 +85,10 @@ The compatibility renderer can maintain a virtual classic console:
 3. Preserve previous snapshots in `history`.
 4. Expose current numeric choices as `actions`.
 
+ERAplay currently starts this idea with a `ClassicConsoleBuffer`: a small virtual
+console that keeps `current_lines` and `history_lines` separate. This gives the
+runtime a compatibility path before smarter UI classification exists.
+
 New ERAplay-native scripts can use explicit APIs later, for example:
 
 ```erb

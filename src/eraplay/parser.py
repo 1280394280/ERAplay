@@ -12,6 +12,7 @@ from eraplay.ast import (
     Label,
     Node,
     Program,
+    Return,
     SourceSpan,
 )
 from eraplay.diagnostics import Diagnostic, EraPlaySyntaxError
@@ -50,6 +51,12 @@ def parse_line(line: LogicalLine) -> Node:
     if upper.startswith("CALL "):
         target, args = _split_head_args(text[5:].strip(), line.span)
         return Call(line.span, target, args)
+
+    if upper == "RETURN":
+        return Return(line.span)
+
+    if upper.startswith("RETURN "):
+        return Return(line.span, text[7:].strip())
 
     assignment = _ASSIGN_RE.match(text)
     if assignment:

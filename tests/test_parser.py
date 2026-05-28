@@ -1,5 +1,9 @@
-from eraplay.ast import Assignment, Call, Command, ElseBlock, EndIf, IfBlock, Label
+from pathlib import Path
+
+from eraplay.ast import Assignment, Call, Command, ElseBlock, EndIf, IfBlock, Label, Return
 from eraplay.parser import parse_source
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_parse_basic_erb_subset() -> None:
@@ -47,3 +51,22 @@ def test_parse_function_label() -> None:
     assert isinstance(program.nodes[0], Label)
     assert program.nodes[0].name == "CALC"
     assert program.nodes[0].is_event is False
+    assert isinstance(program.nodes[1], Return)
+    assert program.nodes[1].expression == "1"
+
+
+def test_parse_all_erb_fixtures() -> None:
+    for path in sorted((ROOT / "fixtures" / "erb").glob("*.erb")):
+        source = path.read_text(encoding="utf-8")
+        program = parse_source(source, str(path))
+        assert program.nodes, path
+
+
+def test_parse_call_fixture_keeps_target_and_args() -> None:
+    path = ROOT / "fixtures" / "erb" / "call.erb"
+    program = parse_source(path.read_text(encoding="utf-8"), str(path))
+    calls = [node for node in program.nodes if isinstance(node, Call)]
+
+    assert len(calls) == 1
+    assert calls[0].target == "GREET"
+    assert calls[0].args == ('"患者"', "1")
