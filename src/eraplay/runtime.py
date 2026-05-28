@@ -21,6 +21,12 @@ class RuntimeResult:
     state: RuntimeState
 
 
+@dataclass
+class RuntimeFrame:
+    nodes: tuple[Node, ...]
+    index: int
+
+
 class RuntimeError(Exception):
     pass
 
@@ -31,9 +37,19 @@ class MiniRuntime:
         self.console = ClassicConsoleBuffer()
         self.state = RuntimeState()
         self.labels = self._collect_labels(project)
+        self.stack: list[RuntimeFrame] = []
 
     def run(self, entry: str = "EVENTFIRST") -> RuntimeResult:
         self.call(entry)
+        return RuntimeResult(self.console, self.state)
+
+    def resume(self, value: int | str) -> RuntimeResult:
+        if not self.state.waiting_for_input:
+            raise RuntimeError("runtime is not waiting for input")
+        self.state.result = value
+        self.state.variables["RESULT"] = value
+        self.state.waiting_for_input = False
+        self._run_until_wait()
         return RuntimeResult(self.console, self.state)
 
     def call(self, label: str) -> int | str | None:
@@ -41,18 +57,25 @@ class MiniRuntime:
         if key not in self.labels:
             raise RuntimeError(f"missing label: {label}")
         nodes, start = self.labels[key]
-        index = start + 1
-        while index < len(nodes):
-            if self.state.waiting_for_input:
-                break
-            node = nodes[index]
+        self.stack.append(RuntimeFrame(nodes, start + 1))
+        self._run_until_wait()
+        return self.state.result
+
+    def _run_until_wait(self) -> None:
+        while self.stack and not self.state.waiting_for_input:
+            frame = self.stack[-1]
+            if frame.index >= len(frame.nodes):
+                self.stack.pop()
+                continue
+            node = frame.nodes[frame.index]
             if isinstance(node, Label):
-                break
+                self.stack.pop()
+                continue
             if isinstance(node, Return):
                 self.state.result = self._eval_value(node.expression) if node.expression else None
-                return self.state.result
-            index = self._execute_at(nodes, index)
-        return None
+                self.stack.pop()
+                continue
+            frame.index = self._execute_at(frame.nodes, frame.index)
 
     def _execute_at(self, nodes: tuple[Node, ...], index: int) -> int:
         node = nodes[index]
@@ -64,6 +87,9 @@ class MiniRuntime:
             return self._find_matching_endif(nodes, index) + 1
         if isinstance(node, EndIf):
             return index + 1
+        if isinstance(node, Call):
+            self._push_call(node.target)
+            return index + 1
         self._execute_node(node)
         return index + 1
 
@@ -72,8 +98,6 @@ class MiniRuntime:
             self._execute_command(node)
         elif isinstance(node, Assignment):
             self.state.variables[node.target.upper()] = self._eval_value(node.expression)
-        elif isinstance(node, Call):
-            self.call(node.target)
 
     def _execute_command(self, command: Command) -> None:
         text = " ".join(command.args)
@@ -88,6 +112,13 @@ class MiniRuntime:
         elif command.name == "INPUT":
             self.state.waiting_for_input = True
             return
+
+    def _push_call(self, label: str) -> None:
+        key = label.upper()
+        if key not in self.labels:
+            raise RuntimeError(f"missing label: {label}")
+        nodes, start = self.labels[key]
+        self.stack.append(RuntimeFrame(nodes, start + 1))
 
     def _eval_value(self, expression: str | None) -> int | str:
         if expression is None:

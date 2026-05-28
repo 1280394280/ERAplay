@@ -151,3 +151,48 @@ INPUT
     assert events[0].channel.value == "actions"
     assert events[0].choice_id == "95"
     assert events[0].text == "思考一下"
+
+
+def test_runtime_resumes_after_input(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+PRINTL "[1] 通常業務"
+INPUT
+PRINTL "after input"
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+    runtime = MiniRuntime(project)
+
+    runtime.run()
+    result = runtime.resume(1)
+
+    assert result.state.waiting_for_input is False
+    assert result.state.variables["RESULT"] == 1
+    assert result.console.visible_text() == "[1] 通常業務\nafter input"
+
+
+def test_runtime_resumes_after_input_inside_call(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+CALL CHOOSE
+PRINTL "returned"
+
+$CHOOSE
+PRINTL "[2] 診察"
+INPUT
+RETURN RESULT
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+    runtime = MiniRuntime(project)
+
+    runtime.run()
+    result = runtime.resume(2)
+
+    assert result.state.result == 2
+    assert result.console.visible_text() == "[2] 診察\nreturned"
