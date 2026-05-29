@@ -27,8 +27,24 @@ def test_check_project_reports_diagnostics(tmp_path: Path) -> None:
     assert "1 diagnostic(s)" in out.getvalue()
 
 
+def test_check_project_accepts_external_call_override(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text("@EVENTFIRST\nCALL MISSING\n", encoding="utf-8")
+    out = StringIO()
+
+    exit_code = check_project(tmp_path, out=out, external_calls=("MISSING",))
+
+    assert exit_code == 0
+    assert "OK:" in out.getvalue()
+
+
 def test_main_check_command() -> None:
     assert main(["check", str(ROOT / "fixtures")]) == 0
+
+
+def test_main_check_external_call_option(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text("@EVENTFIRST\nCALL MISSING\n", encoding="utf-8")
+
+    assert main(["check", str(tmp_path), "--external-call", "MISSING"]) == 0
 
 
 def test_list_symbols_reports_indexed_symbols() -> None:

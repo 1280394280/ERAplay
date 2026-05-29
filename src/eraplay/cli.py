@@ -21,7 +21,12 @@ def main(argv: list[str] | None = None) -> int:
     return args.handler(args)
 
 
-def check_project(path: str | Path, encoding: str | None = None, out: TextIO | None = None) -> int:
+def check_project(
+    path: str | Path,
+    encoding: str | None = None,
+    out: TextIO | None = None,
+    external_calls: tuple[str, ...] = (),
+) -> int:
     if out is None:
         import sys
 
@@ -29,7 +34,7 @@ def check_project(path: str | Path, encoding: str | None = None, out: TextIO | N
 
     project = load_project(path, preferred_encoding=encoding)
     index = build_project_index(project)
-    diagnostics = analyze_project(project, index)
+    diagnostics = analyze_project(project, index, external_calls=external_calls)
 
     if not diagnostics:
         print(
@@ -142,7 +147,19 @@ def _build_parser() -> argparse.ArgumentParser:
         "--encoding",
         help="preferred source encoding, for example utf-8, cp932, cp950, or cp936",
     )
-    check.set_defaults(handler=lambda args: check_project(args.path, args.encoding))
+    check.add_argument(
+        "--external-call",
+        action="append",
+        default=[],
+        help="treat a CALL target as provided externally",
+    )
+    check.set_defaults(
+        handler=lambda args: check_project(
+            args.path,
+            args.encoding,
+            external_calls=tuple(args.external_call),
+        )
+    )
 
     symbols = subparsers.add_parser("symbols", help="list indexed project symbols")
     symbols.add_argument("path", help="project directory to index")

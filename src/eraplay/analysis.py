@@ -8,13 +8,17 @@ from eraplay.index import ProjectIndex, SymbolKind, build_project_index
 from eraplay.project import EraProject
 
 
-def analyze_project(project: EraProject, index: ProjectIndex | None = None) -> tuple[Diagnostic, ...]:
+def analyze_project(
+    project: EraProject,
+    index: ProjectIndex | None = None,
+    external_calls: tuple[str, ...] = (),
+) -> tuple[Diagnostic, ...]:
     if index is None:
         index = build_project_index(project)
 
     diagnostics: list[Diagnostic] = []
     diagnostics.extend(_diagnose_duplicate_labels(index))
-    diagnostics.extend(_diagnose_unresolved_jumps(project, index))
+    diagnostics.extend(_diagnose_unresolved_jumps(project, index, external_calls))
     diagnostics.extend(_diagnose_erh_declarations(project))
     diagnostics.extend(_diagnose_csv_rows(project))
     return tuple(diagnostics)
@@ -43,11 +47,22 @@ def _diagnose_duplicate_labels(index: ProjectIndex) -> list[Diagnostic]:
     return diagnostics
 
 
-def _diagnose_unresolved_jumps(project: EraProject, index: ProjectIndex) -> list[Diagnostic]:
+def _diagnose_unresolved_jumps(
+    project: EraProject,
+    index: ProjectIndex,
+    external_calls: tuple[str, ...],
+) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
+    known_external_calls = {
+        name.upper() for name in (*project.config.external_calls, *external_calls)
+    }
     for loaded in project.erb_files:
         for node in loaded.program.nodes:
-            if isinstance(node, Call) and not index.find(node.target, SymbolKind.LABEL):
+            if (
+                isinstance(node, Call)
+                and node.target.upper() not in known_external_calls
+                and not index.find(node.target, SymbolKind.LABEL)
+            ):
                 diagnostics.append(
                     Diagnostic(f"unresolved CALL target '{node.target}'", node.span, "error")
                 )

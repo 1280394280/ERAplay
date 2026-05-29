@@ -8,7 +8,11 @@ from eraplay.ui import OutputChannel
 def test_project_config_from_dict() -> None:
     config = ProjectConfig.from_dict(
         {
-            "project": {"source_encoding": "cp950", "exclude_dirs": ["docs", "backup"]},
+            "project": {
+                "source_encoding": "cp950",
+                "exclude_dirs": ["docs", "backup"],
+                "external_calls": ["SERIHU_FULLCOLOR"],
+            },
             "translation": {
                 "enabled": True,
                 "source_language": "ja",
@@ -21,6 +25,7 @@ def test_project_config_from_dict() -> None:
 
     assert config.source_encoding == "cp950"
     assert config.exclude_dirs == ("docs", "backup")
+    assert config.external_calls == ("SERIHU_FULLCOLOR",)
     assert config.translation.enabled is True
     assert config.translation.display_mode is TranslationDisplayMode.BILINGUAL
     assert config.translation.translate_channels == (
@@ -54,6 +59,7 @@ def test_default_config_text_contains_encoding() -> None:
 
     assert 'source_encoding = "cp950"' in text
     assert "exclude_dirs" in text
+    assert "external_calls" in text
     assert "[translation]" in text
 
 

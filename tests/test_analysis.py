@@ -23,6 +23,24 @@ def test_unresolved_call_is_reported(tmp_path: Path) -> None:
     assert diagnostics[0].span.line == 2
 
 
+def test_configured_external_call_is_not_reported(tmp_path: Path) -> None:
+    (tmp_path / "eraplay.toml").write_text(
+        '[project]\nexternal_calls = ["MISSING"]\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "main.erb").write_text("@EVENTFIRST\nCALL MISSING\n", encoding="utf-8")
+    project = load_project(tmp_path)
+
+    assert analyze_project(project) == ()
+
+
+def test_external_call_override_is_not_reported(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text("@EVENTFIRST\nCALL MISSING\n", encoding="utf-8")
+    project = load_project(tmp_path)
+
+    assert analyze_project(project, external_calls=("MISSING",)) == ()
+
+
 def test_unresolved_goto_is_reported(tmp_path: Path) -> None:
     (tmp_path / "broken.erb").write_text("@EVENTFIRST\nGOTO MISSING\n", encoding="utf-8")
     project = load_project(tmp_path)

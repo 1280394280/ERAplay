@@ -17,12 +17,14 @@ DEFAULT_EXCLUDE_DIRS = (
     "\u8cc7\u6599",
     "\u9644\u4ef6",
 )
+DEFAULT_EXTERNAL_CALLS: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
 class ProjectConfig:
     source_encoding: str | None = None
     exclude_dirs: tuple[str, ...] = DEFAULT_EXCLUDE_DIRS
+    external_calls: tuple[str, ...] = DEFAULT_EXTERNAL_CALLS
     translation: TranslationConfig = field(default_factory=TranslationConfig)
 
     @classmethod
@@ -32,6 +34,11 @@ class ProjectConfig:
         return cls(
             source_encoding=_optional_str(project_data, "source_encoding"),
             exclude_dirs=_optional_str_tuple(project_data, "exclude_dirs", DEFAULT_EXCLUDE_DIRS),
+            external_calls=_optional_str_tuple(
+                project_data,
+                "external_calls",
+                DEFAULT_EXTERNAL_CALLS,
+            ),
             translation=TranslationConfig.from_dict(translation_data),
         )
 
@@ -48,6 +55,7 @@ def default_config_text(source_encoding: str = "utf-8") -> str:
     return f"""[project]
 source_encoding = "{source_encoding}"
 exclude_dirs = [".git", "__pycache__", "sav", "save", "debug", "resources", "資料", "附件"]
+external_calls = []
 
 [translation]
 enabled = false
