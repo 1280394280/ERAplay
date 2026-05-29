@@ -1,6 +1,20 @@
 from pathlib import Path
 
-from eraplay.ast import Assignment, Call, Command, ElseBlock, EndIf, Goto, IfBlock, Label, Return
+from eraplay.ast import (
+    Assignment,
+    Call,
+    Case,
+    CaseElse,
+    Command,
+    ElseBlock,
+    EndIf,
+    EndSelect,
+    Goto,
+    IfBlock,
+    Label,
+    Return,
+    SelectCase,
+)
 from eraplay.parser import parse_source
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -79,3 +93,25 @@ def test_parse_goto_and_jump() -> None:
     assert program.nodes[1].target == "NEXT"
     assert isinstance(program.nodes[2], Goto)
     assert program.nodes[2].target == "END"
+
+
+def test_parse_selectcase() -> None:
+    program = parse_source(
+        """
+@EVENTFIRST
+SELECTCASE RESULT
+CASE 1, 2
+PRINTL "matched"
+CASEELSE
+PRINTL "else"
+ENDSELECT
+""",
+        "sample.erb",
+    )
+
+    assert isinstance(program.nodes[1], SelectCase)
+    assert program.nodes[1].expression == "RESULT"
+    assert isinstance(program.nodes[2], Case)
+    assert program.nodes[2].values == ("1", "2")
+    assert isinstance(program.nodes[4], CaseElse)
+    assert isinstance(program.nodes[6], EndSelect)

@@ -5,15 +5,19 @@ import re
 from eraplay.ast import (
     Assignment,
     Call,
+    Case,
+    CaseElse,
     Command,
     ElseBlock,
     EndIf,
+    EndSelect,
     Goto,
     IfBlock,
     Label,
     Node,
     Program,
     Return,
+    SelectCase,
     SourceSpan,
 )
 from eraplay.diagnostics import Diagnostic, EraPlaySyntaxError
@@ -46,8 +50,21 @@ def parse_line(line: LogicalLine) -> Node:
     if upper == "ENDIF":
         return EndIf(line.span)
 
+    if upper == "CASEELSE":
+        return CaseElse(line.span)
+
+    if upper == "ENDSELECT":
+        return EndSelect(line.span)
+
     if upper.startswith("IF "):
         return IfBlock(line.span, text[3:].strip())
+
+    if upper.startswith("SELECTCASE "):
+        return SelectCase(line.span, text[11:].strip())
+
+    if upper.startswith("CASE "):
+        values = tuple(part.strip() for part in _split_csv_like(text[5:].strip()) if part.strip())
+        return Case(line.span, values)
 
     if upper.startswith("CALL "):
         target, args = _split_head_args(text[5:].strip(), line.span)

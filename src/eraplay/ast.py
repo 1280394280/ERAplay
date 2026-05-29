@@ -19,6 +19,10 @@ class NodeKind(str, Enum):
     IF = "if"
     ELSE = "else"
     ENDIF = "endif"
+    SELECTCASE = "selectcase"
+    CASE = "case"
+    CASEELSE = "caseelse"
+    ENDSELECT = "endselect"
     CALL = "call"
     GOTO = "goto"
 
@@ -96,6 +100,40 @@ class ElseBlock(Node):
 class EndIf(Node):
     def __init__(self, span: SourceSpan) -> None:
         object.__setattr__(self, "kind", NodeKind.ENDIF)
+        object.__setattr__(self, "span", span)
+
+
+@dataclass(frozen=True)
+class SelectCase(Node):
+    expression: str
+
+    def __init__(self, span: SourceSpan, expression: str) -> None:
+        object.__setattr__(self, "kind", NodeKind.SELECTCASE)
+        object.__setattr__(self, "span", span)
+        object.__setattr__(self, "expression", expression)
+
+
+@dataclass(frozen=True)
+class Case(Node):
+    values: tuple[str, ...]
+
+    def __init__(self, span: SourceSpan, values: tuple[str, ...]) -> None:
+        object.__setattr__(self, "kind", NodeKind.CASE)
+        object.__setattr__(self, "span", span)
+        object.__setattr__(self, "values", values)
+
+
+@dataclass(frozen=True)
+class CaseElse(Node):
+    def __init__(self, span: SourceSpan) -> None:
+        object.__setattr__(self, "kind", NodeKind.CASEELSE)
+        object.__setattr__(self, "span", span)
+
+
+@dataclass(frozen=True)
+class EndSelect(Node):
+    def __init__(self, span: SourceSpan) -> None:
+        object.__setattr__(self, "kind", NodeKind.ENDSELECT)
         object.__setattr__(self, "span", span)
 
 

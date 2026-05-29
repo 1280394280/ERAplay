@@ -3,7 +3,22 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from eraplay.ast import Assignment, Call, Command, ElseBlock, EndIf, Goto, IfBlock, Label, Node, Return
+from eraplay.ast import (
+    Assignment,
+    Call,
+    Case,
+    CaseElse,
+    Command,
+    ElseBlock,
+    EndIf,
+    EndSelect,
+    Goto,
+    IfBlock,
+    Label,
+    Node,
+    Return,
+    SelectCase,
+)
 from eraplay.console import ClassicConsoleBuffer
 from eraplay.project import EraProject
 
@@ -91,6 +106,12 @@ class MiniRuntime:
         if isinstance(node, ElseBlock):
             return self._find_matching_endif(nodes, index) + 1
         if isinstance(node, EndIf):
+            return index + 1
+        if isinstance(node, SelectCase):
+            return self._select_case_target(nodes, index)
+        if isinstance(node, (Case, CaseElse)):
+            return self._find_matching_endselect(nodes, index) + 1
+        if isinstance(node, EndSelect):
             return index + 1
         if isinstance(node, Call):
             self._push_call(node.target)
@@ -183,6 +204,43 @@ class MiniRuntime:
             if isinstance(node, IfBlock):
                 depth += 1
             elif isinstance(node, EndIf):
+                if depth == 0:
+                    return cursor
+                depth -= 1
+        return len(nodes) - 1
+
+    def _select_case_target(self, nodes: tuple[Node, ...], index: int) -> int:
+        select = nodes[index]
+        if not isinstance(select, SelectCase):
+            return index + 1
+        selected_value = self._eval_value(select.expression)
+        case_else_index: int | None = None
+        depth = 0
+        for cursor in range(index + 1, len(nodes)):
+            node = nodes[cursor]
+            if isinstance(node, SelectCase):
+                depth += 1
+            elif isinstance(node, EndSelect):
+                if depth == 0:
+                    if case_else_index is not None:
+                        return case_else_index + 1
+                    return cursor + 1
+                depth -= 1
+            elif depth == 0 and isinstance(node, Case):
+                if any(self._eval_value(value) == selected_value for value in node.values):
+                    return cursor + 1
+            elif depth == 0 and isinstance(node, CaseElse):
+                case_else_index = cursor
+        return len(nodes)
+
+    @staticmethod
+    def _find_matching_endselect(nodes: tuple[Node, ...], index: int) -> int:
+        depth = 0
+        for cursor in range(index + 1, len(nodes)):
+            node = nodes[cursor]
+            if isinstance(node, SelectCase):
+                depth += 1
+            elif isinstance(node, EndSelect):
                 if depth == 0:
                     return cursor
                 depth -= 1

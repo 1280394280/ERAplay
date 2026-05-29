@@ -254,3 +254,69 @@ GOTO EVENTFIRST
         assert "step limit exceeded" in str(error)
     else:
         raise AssertionError("expected RuntimeError")
+
+
+def test_runtime_selectcase_matches_case(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+RESULT = 2
+SELECTCASE RESULT
+CASE 1
+PRINTL "one"
+CASE 2
+PRINTL "two"
+CASEELSE
+PRINTL "else"
+ENDSELECT
+PRINTL "done"
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+
+    result = run_project(project)
+
+    assert result.console.visible_text() == "two\ndone"
+
+
+def test_runtime_selectcase_uses_caseelse(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+RESULT = 9
+SELECTCASE RESULT
+CASE 1, 2
+PRINTL "small"
+CASEELSE
+PRINTL "else"
+ENDSELECT
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+
+    result = run_project(project)
+
+    assert result.console.visible_text() == "else"
+
+
+def test_runtime_selectcase_matches_string_case(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+RESULT = "診察"
+SELECTCASE RESULT
+CASE "診察"
+PRINTL "matched"
+CASEELSE
+PRINTL "else"
+ENDSELECT
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+
+    result = run_project(project)
+
+    assert result.console.visible_text() == "matched"
