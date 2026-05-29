@@ -121,7 +121,7 @@ def create_preview_server(
 
 
 def _runtime_state(runtime: MiniRuntime, translation=None) -> dict[str, object]:
-    info: list[str] = []
+    info: list[str] = [_status_line(runtime)]
     main: list[str] = []
     actions: list[dict[str, str]] = []
     history: list[str] = []
@@ -142,6 +142,11 @@ def _runtime_state(runtime: MiniRuntime, translation=None) -> dict[str, object]:
         "history": history,
         "waiting": runtime.state.waiting_for_input,
         "translation_mode": translation.display_mode.value if translation is not None else "original",
+        "status": {
+            "waiting": runtime.state.waiting_for_input,
+            "steps": runtime.state.steps,
+            "result": runtime.state.result,
+        },
     }
 
 
@@ -172,6 +177,12 @@ def _coerce_input(value: str) -> int | str:
     return value
 
 
+def _status_line(runtime: MiniRuntime) -> str:
+    waiting = "waiting" if runtime.state.waiting_for_input else "running"
+    result = "" if runtime.state.result is None else str(runtime.state.result)
+    return f"state={waiting} steps={runtime.state.steps} result={result}"
+
+
 PAGE_HTML = """<!doctype html>
 <html lang="en">
 <head>
@@ -188,7 +199,7 @@ PAGE_HTML = """<!doctype html>
     .modes { display: inline-flex; gap: 6px; }
     .modes button { padding: 5px 8px; }
     .modes button.active { background: #39616c; }
-    #info { padding: 10px 14px; border-bottom: 1px solid #222; color: #c9f2ff; min-height: 22px; }
+    #info { padding: 10px 14px; border-bottom: 1px solid #222; color: #c9f2ff; min-height: 22px; font-size: 13px; }
     main { display: grid; grid-template-columns: 1fr 320px; min-height: 0; }
     #main { padding: 14px; white-space: pre-wrap; line-height: 1.55; overflow: auto; }
     #history { padding: 14px; border-left: 1px solid #333; color: #888; overflow: auto; white-space: pre-wrap; }
