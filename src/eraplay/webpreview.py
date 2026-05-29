@@ -52,6 +52,7 @@ def create_preview_server(
             body = self.rfile.read(length).decode("utf-8")
             data = parse_qs(body)
             value = data.get("value", [""])[0]
+            runtime.console.clear()
             runtime.resume(_coerce_input(value))
             self._send_json(_runtime_state(runtime))
 
@@ -80,6 +81,7 @@ def create_preview_server(
 
 
 def _runtime_state(runtime: MiniRuntime) -> dict[str, object]:
+    info: list[str] = []
     main: list[str] = []
     actions: list[dict[str, str]] = []
     history: list[str] = []
@@ -93,6 +95,7 @@ def _runtime_state(runtime: MiniRuntime) -> dict[str, object]:
     if not runtime.state.waiting_for_input:
         actions = []
     return {
+        "info": info,
         "main": main,
         "actions": actions,
         "history": history,
@@ -118,10 +121,11 @@ PAGE_HTML = """<!doctype html>
     body { margin: 0; background: #080808; color: #d8d8d8; }
     .layout { min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
     header { padding: 10px 14px; border-bottom: 1px solid #333; color: #89dceb; }
-    main { display: grid; grid-template-columns: 1fr 280px; min-height: 0; }
+    #info { padding: 10px 14px; border-bottom: 1px solid #222; color: #c9f2ff; min-height: 22px; }
+    main { display: grid; grid-template-columns: 1fr 320px; min-height: 0; }
     #main { padding: 14px; white-space: pre-wrap; line-height: 1.55; overflow: auto; }
-    #history { padding: 14px; border-left: 1px solid #333; color: #888; overflow: auto; }
-    #actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px; border-top: 1px solid #333; }
+    #history { padding: 14px; border-left: 1px solid #333; color: #888; overflow: auto; white-space: pre-wrap; }
+    #actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px; border-top: 1px solid #333; min-height: 44px; }
     button { background: #1b2a2f; color: #e8f8ff; border: 1px solid #39616c; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
     button:hover { background: #24404a; }
   </style>
@@ -129,6 +133,7 @@ PAGE_HTML = """<!doctype html>
 <body>
   <div class="layout">
     <header>ERAplay Preview</header>
+    <section id="info"></section>
     <main>
       <section id="main"></section>
       <aside id="history"></aside>
@@ -138,6 +143,7 @@ PAGE_HTML = """<!doctype html>
   <script>
     async function refresh() {
       const state = await fetch('/state').then(r => r.json());
+      document.querySelector('#info').textContent = state.info.join('\\n');
       document.querySelector('#main').textContent = state.main.join('\\n');
       document.querySelector('#history').textContent = state.history.join('\\n');
       const actions = document.querySelector('#actions');

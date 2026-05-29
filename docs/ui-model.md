@@ -92,6 +92,10 @@ runtime a compatibility path before smarter UI classification exists.
 The first classifier recognizes simple action lines shaped like `[95] 思考一下`
 and emits `actions` events with `choice_id = "95"`.
 
+The web preview now uses these regions directly: current output is rendered in
+`main`, detected choices in `actions`, and the previous screen is moved to
+`history` when the user submits input.
+
 New ERAplay-native scripts can use explicit APIs later, for example:
 
 ```erb
