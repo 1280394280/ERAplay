@@ -23,6 +23,17 @@ def test_unresolved_call_is_reported(tmp_path: Path) -> None:
     assert diagnostics[0].span.line == 2
 
 
+def test_unresolved_goto_is_reported(tmp_path: Path) -> None:
+    (tmp_path / "broken.erb").write_text("@EVENTFIRST\nGOTO MISSING\n", encoding="utf-8")
+    project = load_project(tmp_path)
+
+    diagnostics = analyze_project(project)
+
+    assert len(diagnostics) == 1
+    assert diagnostics[0].message == "unresolved GOTO/JUMP target 'MISSING'"
+    assert diagnostics[0].span.line == 2
+
+
 def test_duplicate_label_is_reported(tmp_path: Path) -> None:
     (tmp_path / "a.erb").write_text("$CALC\nRETURN 1\n", encoding="utf-8")
     (tmp_path / "b.erb").write_text("$CALC\nRETURN 2\n", encoding="utf-8")

@@ -127,6 +127,7 @@ diagnostics. The first checks are intentionally conservative:
 
 - duplicate labels,
 - unresolved `CALL` targets,
+- unresolved `GOTO`/`JUMP` targets,
 - empty ERH declarations,
 - empty CSV keys.
 

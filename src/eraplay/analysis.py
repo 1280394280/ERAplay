@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from eraplay.ast import Call, SourceSpan
+from eraplay.ast import Call, Goto, SourceSpan
 from eraplay.diagnostics import Diagnostic
 from eraplay.index import ProjectIndex, SymbolKind, build_project_index
 from eraplay.project import EraProject
@@ -14,7 +14,7 @@ def analyze_project(project: EraProject, index: ProjectIndex | None = None) -> t
 
     diagnostics: list[Diagnostic] = []
     diagnostics.extend(_diagnose_duplicate_labels(index))
-    diagnostics.extend(_diagnose_unresolved_calls(project, index))
+    diagnostics.extend(_diagnose_unresolved_jumps(project, index))
     diagnostics.extend(_diagnose_erh_declarations(project))
     diagnostics.extend(_diagnose_csv_rows(project))
     return tuple(diagnostics)
@@ -43,13 +43,17 @@ def _diagnose_duplicate_labels(index: ProjectIndex) -> list[Diagnostic]:
     return diagnostics
 
 
-def _diagnose_unresolved_calls(project: EraProject, index: ProjectIndex) -> list[Diagnostic]:
+def _diagnose_unresolved_jumps(project: EraProject, index: ProjectIndex) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
     for loaded in project.erb_files:
         for node in loaded.program.nodes:
             if isinstance(node, Call) and not index.find(node.target, SymbolKind.LABEL):
                 diagnostics.append(
                     Diagnostic(f"unresolved CALL target '{node.target}'", node.span, "error")
+                )
+            elif isinstance(node, Goto) and not index.find(node.target, SymbolKind.LABEL):
+                diagnostics.append(
+                    Diagnostic(f"unresolved GOTO/JUMP target '{node.target}'", node.span, "error")
                 )
     return diagnostics
 
