@@ -13,7 +13,7 @@ def test_check_project_reports_ok_for_fixtures() -> None:
 
     assert exit_code == 0
     assert "OK:" in out.getvalue()
-    assert "5 ERB" in out.getvalue()
+    assert "6 ERB" in out.getvalue()
 
 
 def test_check_project_reports_diagnostics(tmp_path: Path) -> None:
@@ -104,3 +104,21 @@ PRINTL "after input"
     assert "[actions]" in text
     assert "1: 通常業務" in text
     assert "after input" in text
+
+
+def test_play_fixture_demo_menu() -> None:
+    out = StringIO()
+    inputs = iter(["2"])
+
+    exit_code = play_project(
+        ROOT / "fixtures",
+        entry="DEMO_MENU",
+        out=out,
+        input_func=lambda _prompt: next(inputs),
+    )
+
+    text = out.getvalue()
+    assert exit_code == 0
+    assert "ERAplay demo" in text
+    assert "2: 診察" in text
+    assert "診察を選択しました。" in text

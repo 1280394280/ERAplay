@@ -162,6 +162,9 @@ loader/parser/console stack can produce visible output from a project.
 `play` wraps the minimal runtime with a terminal loop: it prints visible output,
 lists detected action events, reads a choice, and resumes execution.
 
+The fixture project includes `@DEMO_MENU`, a tiny input/selectcase flow used as
+the first interactive smoke test.
+
 ## Compatibility Strategy
 
 ERAplay should keep two modes:

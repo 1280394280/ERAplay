@@ -63,6 +63,12 @@ Play interactively in the terminal:
 eraplay play D:\work\py\ERAplay\fixtures --entry EVENTFIRST
 ```
 
+Try the included menu demo:
+
+```powershell
+eraplay play D:\work\py\ERAplay\fixtures --entry DEMO_MENU
+```
+
 ## Reference Sources
 
 The local sibling projects are used as references only:

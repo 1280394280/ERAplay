@@ -10,7 +10,7 @@ def test_load_fixture_project() -> None:
     project = load_project(ROOT / "fixtures")
 
     assert project.config.source_encoding == "utf-8"
-    assert len(project.erb_files) == 5
+    assert len(project.erb_files) == 6
     assert len(project.erh_files) == 2
     assert len(project.csv_files) == 2
 
@@ -21,6 +21,7 @@ def test_load_fixture_project() -> None:
         if isinstance(node, Label)
     ]
     assert "EVENTFIRST" in labels
+    assert "DEMO_MENU" in labels
     assert "GREET" in labels
 
     dim_names = [
