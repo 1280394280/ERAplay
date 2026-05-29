@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -9,6 +10,29 @@ from eraplay.project import load_project
 from eraplay.runtime import MiniRuntime
 from eraplay.translation import TranslationConfig, TranslationDisplayMode, translate_event_text
 from eraplay.ui import OutputChannel, OutputKind
+
+
+@dataclass
+class PreviewSession:
+    project_path: str | Path
+    entry: str
+    encoding: str | None = None
+    runtime: MiniRuntime | None = None
+
+    def start(self) -> MiniRuntime:
+        project = load_project(self.project_path, preferred_encoding=self.encoding)
+        runtime = MiniRuntime(project)
+        runtime.run(self.entry)
+        self.runtime = runtime
+        return runtime
+
+    def current(self) -> MiniRuntime:
+        if self.runtime is None:
+            return self.start()
+        return self.runtime
+
+    def restart(self) -> MiniRuntime:
+        return self.start()
 
 
 def serve_preview(
@@ -30,9 +54,8 @@ def create_preview_server(
     port: int = 8765,
     encoding: str | None = None,
 ) -> ThreadingHTTPServer:
-    project = load_project(path, preferred_encoding=encoding)
-    runtime = MiniRuntime(project)
-    runtime.run(entry)
+    session = PreviewSession(path, entry, encoding)
+    session.start()
 
     class PreviewHandler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
@@ -42,25 +65,34 @@ def create_preview_server(
             elif parsed.path == "/state":
                 query = parse_qs(parsed.query)
                 mode = query.get("mode", [None])[0]
-                translation = _translation_with_mode(project.config.translation, mode)
+                runtime = session.current()
+                translation = _translation_with_mode(runtime.project.config.translation, mode)
                 self._send_json(_runtime_state(runtime, translation))
             else:
                 self.send_error(404)
 
         def do_POST(self) -> None:
             parsed = urlparse(self.path)
-            if parsed.path != "/input":
+            if parsed.path not in ("/input", "/restart"):
                 self.send_error(404)
+                return
+            if parsed.path == "/restart":
+                runtime = session.restart()
+                query = parse_qs(parsed.query)
+                mode = query.get("mode", [None])[0]
+                translation = _translation_with_mode(runtime.project.config.translation, mode)
+                self._send_json(_runtime_state(runtime, translation))
                 return
             length = int(self.headers.get("content-length", "0"))
             body = self.rfile.read(length).decode("utf-8")
             data = parse_qs(body)
             value = data.get("value", [""])[0]
+            runtime = session.current()
             runtime.console.clear()
             runtime.resume(_coerce_input(value))
             query = parse_qs(parsed.query)
             mode = query.get("mode", [None])[0]
-            translation = _translation_with_mode(project.config.translation, mode)
+            translation = _translation_with_mode(runtime.project.config.translation, mode)
             self._send_json(_runtime_state(runtime, translation))
 
         def log_message(self, format: str, *args: object) -> None:
@@ -83,7 +115,8 @@ def create_preview_server(
             self.wfile.write(payload)
 
     server = ThreadingHTTPServer((host, port), PreviewHandler)
-    server.runtime = runtime  # type: ignore[attr-defined]
+    server.session = session  # type: ignore[attr-defined]
+    server.runtime = session.current()  # type: ignore[attr-defined]
     return server
 
 
@@ -151,6 +184,7 @@ PAGE_HTML = """<!doctype html>
     .layout { min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
     header { padding: 10px 14px; border-bottom: 1px solid #333; color: #89dceb; }
     header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .header-tools { display: inline-flex; align-items: center; gap: 10px; }
     .modes { display: inline-flex; gap: 6px; }
     .modes button { padding: 5px 8px; }
     .modes button.active { background: #39616c; }
@@ -167,10 +201,13 @@ PAGE_HTML = """<!doctype html>
   <div class="layout">
     <header>
       <span>ERAplay Preview</span>
-      <span class="modes">
-        <button data-mode="original">Original</button>
-        <button data-mode="translated">Translated</button>
-        <button data-mode="bilingual">Bilingual</button>
+      <span class="header-tools">
+        <button id="restart">Restart</button>
+        <span class="modes">
+          <button data-mode="original">Original</button>
+          <button data-mode="translated">Translated</button>
+          <button data-mode="bilingual">Bilingual</button>
+        </span>
       </span>
     </header>
     <section id="info"></section>
@@ -211,6 +248,10 @@ PAGE_HTML = """<!doctype html>
         await refresh();
       };
     });
+    document.querySelector('#restart').onclick = async () => {
+      await fetch(`/restart?mode=${encodeURIComponent(mode)}`, {method: 'POST'});
+      await refresh();
+    };
     refresh();
   </script>
 </body>

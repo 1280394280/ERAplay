@@ -9,7 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_webpreview_initial_state_has_actions() -> None:
     server = create_preview_server(ROOT / "fixtures", entry="DEMO_MENU", port=0)
     try:
-        state = _runtime_state(server.runtime, server.runtime.project.config.translation)
+        runtime = server.session.current()
+        state = _runtime_state(runtime, runtime.project.config.translation)
     finally:
         server.server_close()
 
@@ -20,7 +21,7 @@ def test_webpreview_initial_state_has_actions() -> None:
 
 def test_webpreview_input_moves_previous_screen_to_history() -> None:
     server = create_preview_server(ROOT / "fixtures", entry="DEMO_MENU", port=0)
-    runtime = server.runtime
+    runtime = server.session.current()
     try:
         runtime.console.clear()
         runtime.resume(2)
@@ -37,10 +38,11 @@ def test_webpreview_input_moves_previous_screen_to_history() -> None:
 def test_webpreview_translation_mode_override() -> None:
     server = create_preview_server(ROOT / "fixtures", entry="DEMO_MENU", port=0)
     try:
-        config = server.runtime.project.config.translation
-        original = _runtime_state(server.runtime, _translation_with_mode(config, "original"))
-        translated = _runtime_state(server.runtime, _translation_with_mode(config, "translated"))
-        bilingual = _runtime_state(server.runtime, _translation_with_mode(config, "bilingual"))
+        runtime = server.session.current()
+        config = runtime.project.config.translation
+        original = _runtime_state(runtime, _translation_with_mode(config, "original"))
+        translated = _runtime_state(runtime, _translation_with_mode(config, "translated"))
+        bilingual = _runtime_state(runtime, _translation_with_mode(config, "bilingual"))
     finally:
         server.server_close()
 
@@ -49,3 +51,21 @@ def test_webpreview_translation_mode_override() -> None:
     assert {"id": "1", "text": "\u901a\u5e38\u696d\u52d9\n\u666e\u901a\u4e1a\u52a1"} in bilingual["actions"]
     assert original["translation_mode"] == "original"
     assert translated["translation_mode"] == "translated"
+
+
+def test_webpreview_session_restart() -> None:
+    server = create_preview_server(ROOT / "fixtures", entry="DEMO_MENU", port=0)
+    try:
+        runtime = server.session.current()
+        runtime.console.clear()
+        runtime.resume(2)
+        finished = _runtime_state(runtime, runtime.project.config.translation)
+        restarted = server.session.restart()
+        fresh = _runtime_state(restarted, restarted.project.config.translation)
+    finally:
+        server.server_close()
+
+    assert finished["waiting"] is False
+    assert fresh["waiting"] is True
+    assert fresh["history"] == []
+    assert {"id": "2", "text": "\u8a3a\u5bdf\n\u8bca\u5bdf"} in fresh["actions"]
