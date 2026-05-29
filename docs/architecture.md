@@ -142,6 +142,7 @@ eraplay check <project>
 eraplay symbols <project>
 eraplay init <project>
 eraplay run <project>
+eraplay play <project>
 ```
 
 `check` loads the project, builds the index, runs diagnostics, and exits with
@@ -156,6 +157,9 @@ The first runtime is deliberately tiny. It can execute labels, `PRINT`, `PRINTL`
 `CALL`, `RETURN`, and simple assignments. It is not an Emuera-compatible runtime
 yet; it exists to prove the loader/parser/console stack can produce visible
 output from a project.
+
+`play` wraps the minimal runtime with a terminal loop: it prints visible output,
+lists detected action events, reads a choice, and resumes execution.
 
 ## Compatibility Strategy
 

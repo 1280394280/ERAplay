@@ -9,7 +9,8 @@ from eraplay.analysis import analyze_project
 from eraplay.config import init_project_config
 from eraplay.index import SymbolKind, build_project_index
 from eraplay.project import load_project
-from eraplay.runtime import run_project
+from eraplay.runtime import MiniRuntime, run_project
+from eraplay.ui import OutputChannel, OutputKind
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -106,6 +107,30 @@ def run_entry(
     return 0
 
 
+def play_project(
+    path: str | Path,
+    entry: str = "EVENTFIRST",
+    encoding: str | None = None,
+    out: TextIO | None = None,
+    input_func=input,
+) -> int:
+    if out is None:
+        out = sys.stdout
+
+    project = load_project(path, preferred_encoding=encoding)
+    runtime = MiniRuntime(project)
+    runtime.run(entry)
+    printed_line_count = 0
+
+    while True:
+        printed_line_count = _print_new_visible_lines(runtime, printed_line_count, out)
+        if not runtime.state.waiting_for_input:
+            return 0
+        _print_actions(runtime, out)
+        value = input_func("> ")
+        runtime.resume(_coerce_input(value))
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="eraplay")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -152,6 +177,19 @@ def _build_parser() -> argparse.ArgumentParser:
         help="preferred source encoding, for example utf-8, cp932, cp950, or cp936",
     )
     run.set_defaults(handler=lambda args: run_entry(args.path, args.entry, args.encoding))
+
+    play = subparsers.add_parser("play", help="run interactively until the game exits")
+    play.add_argument("path", help="project directory to play")
+    play.add_argument(
+        "--entry",
+        default="EVENTFIRST",
+        help="entry label to run",
+    )
+    play.add_argument(
+        "--encoding",
+        help="preferred source encoding, for example utf-8, cp932, cp950, or cp936",
+    )
+    play.set_defaults(handler=lambda args: play_project(args.path, args.entry, args.encoding))
     return parser
 
 
@@ -161,6 +199,33 @@ def _prefer_utf8_stdio() -> None:
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure is not None:
             reconfigure(encoding="utf-8", errors="replace")
+
+
+def _print_new_visible_lines(runtime: MiniRuntime, printed_line_count: int, out: TextIO) -> int:
+    lines = runtime.console.visible_text().splitlines()
+    for line in lines[printed_line_count:]:
+        print(line, file=out)
+    return len(lines)
+
+
+def _print_actions(runtime: MiniRuntime, out: TextIO) -> None:
+    actions = [
+        event
+        for event in runtime.console.to_events()
+        if event.channel is OutputChannel.ACTIONS and event.kind is OutputKind.ACTION
+    ]
+    if not actions:
+        return
+    print("[actions]", file=out)
+    for action in actions:
+        print(f"{action.choice_id}: {action.text}", file=out)
+
+
+def _coerce_input(value: str) -> int | str:
+    value = value.strip()
+    if value.isdigit():
+        return int(value)
+    return value
 
 
 if __name__ == "__main__":

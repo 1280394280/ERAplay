@@ -1,7 +1,7 @@
 from io import StringIO
 from pathlib import Path
 
-from eraplay.cli import check_project, init_project, list_symbols, main, run_entry
+from eraplay.cli import check_project, init_project, list_symbols, main, play_project, run_entry
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -82,3 +82,25 @@ def test_run_entry_prints_output() -> None:
 
     assert exit_code == 0
     assert "hello" in out.getvalue()
+
+
+def test_play_project_resumes_from_fake_input(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+PRINTL "[1] 通常業務"
+INPUT
+PRINTL "after input"
+""",
+        encoding="utf-8",
+    )
+    out = StringIO()
+    inputs = iter(["1"])
+
+    exit_code = play_project(tmp_path, out=out, input_func=lambda _prompt: next(inputs))
+
+    text = out.getvalue()
+    assert exit_code == 0
+    assert "[actions]" in text
+    assert "1: 通常業務" in text
+    assert "after input" in text

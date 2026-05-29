@@ -57,6 +57,12 @@ Run the current minimal runtime:
 eraplay run D:\work\py\ERAplay\fixtures --entry EVENTFIRST
 ```
 
+Play interactively in the terminal:
+
+```powershell
+eraplay play D:\work\py\ERAplay\fixtures --entry EVENTFIRST
+```
+
 ## Reference Sources
 
 The local sibling projects are used as references only:
