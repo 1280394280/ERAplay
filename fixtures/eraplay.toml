@@ -2,9 +2,9 @@
 source_encoding = "utf-8"
 
 [translation]
-enabled = false
+enabled = true
 source_language = "ja"
 target_language = "zh-Hans"
-provider = "none"
+provider = "local-dict"
 display_mode = "bilingual"
-translate_channels = ["info", "main", "actions"]
+translate_channels = ["info", "main", "actions", "history"]

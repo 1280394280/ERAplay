@@ -8,6 +8,7 @@ from eraplay.ui import OutputChannel, OutputEvent
 
 class TranslationProvider(str, Enum):
     NONE = "none"
+    LOCAL_DICT = "local-dict"
     OPENAI_COMPATIBLE = "openai-compatible"
     CUSTOM_HTTP = "custom-http"
     PLUGIN = "plugin"
@@ -81,6 +82,33 @@ def render_translated_text(
             return original
         return f"{original}\n{translated}"
     return translated
+
+
+LOCAL_TRANSLATIONS = {
+    "ERAplay demo": "ERAplay 演示",
+    "通常業務": "普通业务",
+    "診察": "诊察",
+    "通常業務を選択しました。": "已选择普通业务。",
+    "診察を選択しました。": "已选择诊察。",
+    "未対応の選択です。": "未支持的选择。",
+    "[1] 通常業務": "[1] 普通业务",
+    "[2] 診察": "[2] 诊察",
+}
+
+
+def translate_text(text: str, config: TranslationConfig) -> str:
+    if not config.enabled:
+        return text
+    if config.provider is TranslationProvider.LOCAL_DICT:
+        translated = LOCAL_TRANSLATIONS.get(text, text)
+        return render_translated_text(text, translated, config.display_mode)
+    return text
+
+
+def translate_event_text(event: OutputEvent, config: TranslationConfig) -> str:
+    if not config.should_translate(event):
+        return event.text
+    return translate_text(event.text, config)
 
 
 def _str_value(data: dict[str, object], key: str, default: str) -> str:

@@ -3,6 +3,7 @@ from eraplay.translation import (
     TranslationDisplayMode,
     TranslationProvider,
     render_translated_text,
+    translate_text,
 )
 from eraplay.ui import OutputChannel, OutputEvent, OutputKind
 
@@ -46,3 +47,16 @@ def test_render_bilingual_text() -> None:
     )
 
     assert rendered == "\u901a\u5e38\u696d\u52d9\n\u666e\u901a\u4e1a\u52a1"
+
+
+def test_local_dict_translation() -> None:
+    config = TranslationConfig.from_dict(
+        {
+            "enabled": True,
+            "provider": "local-dict",
+            "display_mode": "translated",
+        }
+    )
+
+    assert config.provider is TranslationProvider.LOCAL_DICT
+    assert translate_text("\u901a\u5e38\u696d\u52d9", config) == "\u666e\u901a\u4e1a\u52a1"

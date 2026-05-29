@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlparse
 
 from eraplay.project import load_project
 from eraplay.runtime import MiniRuntime
+from eraplay.translation import translate_event_text
 from eraplay.ui import OutputChannel, OutputKind
 
 
@@ -39,7 +40,7 @@ def create_preview_server(
             if parsed.path == "/":
                 self._send_html(PAGE_HTML)
             elif parsed.path == "/state":
-                self._send_json(_runtime_state(runtime))
+                self._send_json(_runtime_state(runtime, project.config.translation))
             else:
                 self.send_error(404)
 
@@ -54,7 +55,7 @@ def create_preview_server(
             value = data.get("value", [""])[0]
             runtime.console.clear()
             runtime.resume(_coerce_input(value))
-            self._send_json(_runtime_state(runtime))
+            self._send_json(_runtime_state(runtime, project.config.translation))
 
         def log_message(self, format: str, *args: object) -> None:
             return
@@ -80,18 +81,19 @@ def create_preview_server(
     return server
 
 
-def _runtime_state(runtime: MiniRuntime) -> dict[str, object]:
+def _runtime_state(runtime: MiniRuntime, translation=None) -> dict[str, object]:
     info: list[str] = []
     main: list[str] = []
     actions: list[dict[str, str]] = []
     history: list[str] = []
     for event in runtime.console.to_events():
+        text = translate_event_text(event, translation) if translation is not None else event.text
         if event.channel is OutputChannel.ACTIONS and event.kind is OutputKind.ACTION:
-            actions.append({"id": event.choice_id or "", "text": event.text})
+            actions.append({"id": event.choice_id or "", "text": text})
         elif event.channel is OutputChannel.HISTORY:
-            history.append(event.text)
+            history.append(text)
         else:
-            main.append(event.text)
+            main.append(text)
     if not runtime.state.waiting_for_input:
         actions = []
     return {
