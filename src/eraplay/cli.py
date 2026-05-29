@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TextIO
 
 from eraplay.analysis import analyze_project
+from eraplay.compat import build_compatibility_report
 from eraplay.config import init_project_config
 from eraplay.index import SymbolKind, build_project_index
 from eraplay.project import load_project
@@ -74,6 +75,47 @@ def list_symbols(path: str | Path, encoding: str | None = None, out: TextIO | No
                 f"{symbol.name}{detail} - {symbol.span.file}:{symbol.span.line}",
                 file=out,
             )
+    return 0
+
+
+def compatibility_report(
+    path: str | Path,
+    encoding: str | None = None,
+    out: TextIO | None = None,
+    external_calls: tuple[str, ...] = (),
+    top: int = 20,
+) -> int:
+    if out is None:
+        out = sys.stdout
+
+    project = load_project(path, preferred_encoding=encoding)
+    report = build_compatibility_report(project, external_calls=external_calls)
+    diagnostics = report.diagnostics
+    print(f"Compatibility report: {project.root}", file=out)
+    print(
+        f"Files: {len(project.erb_files)} ERB, {len(project.erh_files)} ERH, "
+        f"{len(project.csv_files)} CSV",
+        file=out,
+    )
+    print(f"Diagnostics: {len(diagnostics)}", file=out)
+    if project.config.exclude_dirs:
+        print(f"Excluded dirs: {', '.join(project.config.exclude_dirs)}", file=out)
+    known_external = (*project.config.external_calls, *external_calls)
+    if known_external:
+        print(f"External calls: {', '.join(known_external)}", file=out)
+    if not diagnostics:
+        print("Status: OK", file=out)
+        return 0
+
+    print("[diagnostic kinds]", file=out)
+    for kind, count in report.diagnostic_kinds.most_common():
+        print(f"{count}: {kind}", file=out)
+
+    unresolved_calls = report.unresolved_calls
+    if unresolved_calls:
+        print("[unresolved CALL targets]", file=out)
+        for name, count in unresolved_calls.most_common(top):
+            print(f"{count}: {name}", file=out)
     return 0
 
 
@@ -168,6 +210,33 @@ def _build_parser() -> argparse.ArgumentParser:
         help="preferred source encoding, for example utf-8, cp932, cp950, or cp936",
     )
     symbols.set_defaults(handler=lambda args: list_symbols(args.path, args.encoding))
+
+    compat = subparsers.add_parser("compat", help="summarize ERA project compatibility gaps")
+    compat.add_argument("path", help="project directory to inspect")
+    compat.add_argument(
+        "--encoding",
+        help="preferred source encoding, for example utf-8, cp932, cp950, or cp936",
+    )
+    compat.add_argument(
+        "--external-call",
+        action="append",
+        default=[],
+        help="treat a CALL target as provided externally",
+    )
+    compat.add_argument(
+        "--top",
+        type=int,
+        default=20,
+        help="number of unresolved CALL targets to show",
+    )
+    compat.set_defaults(
+        handler=lambda args: compatibility_report(
+            args.path,
+            args.encoding,
+            external_calls=tuple(args.external_call),
+            top=args.top,
+        )
+    )
 
     init = subparsers.add_parser("init", help="create an eraplay.toml project config")
     init.add_argument("path", help="project directory to initialize")

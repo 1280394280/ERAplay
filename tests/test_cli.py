@@ -1,7 +1,15 @@
 from io import StringIO
 from pathlib import Path
 
-from eraplay.cli import check_project, init_project, list_symbols, main, play_project, run_entry
+from eraplay.cli import (
+    check_project,
+    compatibility_report,
+    init_project,
+    list_symbols,
+    main,
+    play_project,
+    run_entry,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -64,6 +72,41 @@ def test_list_symbols_reports_indexed_symbols() -> None:
 
 def test_main_symbols_command() -> None:
     assert main(["symbols", str(ROOT / "fixtures")]) == 0
+
+
+def test_compatibility_report_summarizes_ok_project() -> None:
+    out = StringIO()
+
+    exit_code = compatibility_report(ROOT / "fixtures", out=out)
+    text = out.getvalue()
+
+    assert exit_code == 0
+    assert "Compatibility report:" in text
+    assert "Diagnostics: 0" in text
+    assert "Status: OK" in text
+
+
+def test_compatibility_report_groups_unresolved_calls(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        "@EVENTFIRST\nCALL MISSING\nCALL MISSING\nCALL OTHER\n",
+        encoding="utf-8",
+    )
+    out = StringIO()
+
+    exit_code = compatibility_report(tmp_path, out=out, top=1)
+    text = out.getvalue()
+
+    assert exit_code == 0
+    assert "Diagnostics: 3" in text
+    assert "3: unresolved CALL" in text
+    assert "2: MISSING" in text
+    assert "1: OTHER" not in text
+
+
+def test_main_compat_command_accepts_external_call(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text("@EVENTFIRST\nCALL MISSING\n", encoding="utf-8")
+
+    assert main(["compat", str(tmp_path), "--external-call", "MISSING"]) == 0
 
 
 def test_init_project_creates_config(tmp_path: Path) -> None:
