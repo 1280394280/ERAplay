@@ -20,6 +20,7 @@ class NodeKind(str, Enum):
     ELSE = "else"
     ENDIF = "endif"
     CALL = "call"
+    GOTO = "goto"
 
 
 @dataclass(frozen=True)
@@ -108,6 +109,16 @@ class Call(Node):
         object.__setattr__(self, "span", span)
         object.__setattr__(self, "target", target)
         object.__setattr__(self, "args", args)
+
+
+@dataclass(frozen=True)
+class Goto(Node):
+    target: str
+
+    def __init__(self, span: SourceSpan, target: str) -> None:
+        object.__setattr__(self, "kind", NodeKind.GOTO)
+        object.__setattr__(self, "span", span)
+        object.__setattr__(self, "target", target)
 
 
 @dataclass(frozen=True)

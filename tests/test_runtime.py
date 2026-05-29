@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from eraplay.project import load_project
-from eraplay.runtime import MiniRuntime, run_project
+from eraplay.runtime import MiniRuntime, RuntimeError, run_project
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -196,3 +196,61 @@ RETURN RESULT
 
     assert result.state.result == 2
     assert result.console.visible_text() == "[2] 診察\nreturned"
+
+
+def test_runtime_goto_replaces_current_flow(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+PRINTL "before"
+GOTO NEXT
+PRINTL "skipped"
+
+$NEXT
+PRINTL "after"
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+
+    result = run_project(project)
+
+    assert result.console.visible_text() == "before\nafter"
+
+
+def test_runtime_jump_aliases_goto(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+JUMP NEXT
+PRINTL "skipped"
+
+$NEXT
+PRINTL "after"
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+
+    result = run_project(project)
+
+    assert result.console.visible_text() == "after"
+
+
+def test_runtime_step_limit_stops_runaway_loop(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+GOTO EVENTFIRST
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+    runtime = MiniRuntime(project, max_steps=5)
+
+    try:
+        runtime.run()
+    except RuntimeError as error:
+        assert "step limit exceeded" in str(error)
+    else:
+        raise AssertionError("expected RuntimeError")

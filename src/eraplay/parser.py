@@ -8,6 +8,7 @@ from eraplay.ast import (
     Command,
     ElseBlock,
     EndIf,
+    Goto,
     IfBlock,
     Label,
     Node,
@@ -51,6 +52,14 @@ def parse_line(line: LogicalLine) -> Node:
     if upper.startswith("CALL "):
         target, args = _split_head_args(text[5:].strip(), line.span)
         return Call(line.span, target, args)
+
+    if upper.startswith("GOTO "):
+        target, _ = _split_head_args(text[5:].strip(), line.span)
+        return Goto(line.span, target)
+
+    if upper.startswith("JUMP "):
+        target, _ = _split_head_args(text[5:].strip(), line.span)
+        return Goto(line.span, target)
 
     if upper == "RETURN":
         return Return(line.span)

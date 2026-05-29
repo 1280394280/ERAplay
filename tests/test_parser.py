@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from eraplay.ast import Assignment, Call, Command, ElseBlock, EndIf, IfBlock, Label, Return
+from eraplay.ast import Assignment, Call, Command, ElseBlock, EndIf, Goto, IfBlock, Label, Return
 from eraplay.parser import parse_source
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -70,3 +70,12 @@ def test_parse_call_fixture_keeps_target_and_args() -> None:
     assert len(calls) == 1
     assert calls[0].target == "GREET"
     assert calls[0].args == ('"患者"', "1")
+
+
+def test_parse_goto_and_jump() -> None:
+    program = parse_source("@EVENTFIRST\nGOTO NEXT\nJUMP END")
+
+    assert isinstance(program.nodes[1], Goto)
+    assert program.nodes[1].target == "NEXT"
+    assert isinstance(program.nodes[2], Goto)
+    assert program.nodes[2].target == "END"

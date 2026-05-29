@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from eraplay.ast import Assignment, Call, Command, ElseBlock, EndIf, IfBlock, Label, Node, Return
+from eraplay.ast import Assignment, Call, Command, ElseBlock, EndIf, Goto, IfBlock, Label, Node, Return
 from eraplay.console import ClassicConsoleBuffer
 from eraplay.project import EraProject
 
@@ -13,6 +13,7 @@ class RuntimeState:
     variables: dict[str, int | str] = field(default_factory=dict)
     result: int | str | None = None
     waiting_for_input: bool = False
+    steps: int = 0
 
 
 @dataclass
@@ -32,12 +33,13 @@ class RuntimeError(Exception):
 
 
 class MiniRuntime:
-    def __init__(self, project: EraProject) -> None:
+    def __init__(self, project: EraProject, max_steps: int = 10000) -> None:
         self.project = project
         self.console = ClassicConsoleBuffer()
         self.state = RuntimeState()
         self.labels = self._collect_labels(project)
         self.stack: list[RuntimeFrame] = []
+        self.max_steps = max_steps
 
     def run(self, entry: str = "EVENTFIRST") -> RuntimeResult:
         self.call(entry)
@@ -63,6 +65,9 @@ class MiniRuntime:
 
     def _run_until_wait(self) -> None:
         while self.stack and not self.state.waiting_for_input:
+            self.state.steps += 1
+            if self.state.steps > self.max_steps:
+                raise RuntimeError(f"runtime step limit exceeded: {self.max_steps}")
             frame = self.stack[-1]
             if frame.index >= len(frame.nodes):
                 self.stack.pop()
@@ -90,6 +95,9 @@ class MiniRuntime:
         if isinstance(node, Call):
             self._push_call(node.target)
             return index + 1
+        if isinstance(node, Goto):
+            self._replace_current_frame(node.target)
+            return self.stack[-1].index
         self._execute_node(node)
         return index + 1
 
@@ -119,6 +127,13 @@ class MiniRuntime:
             raise RuntimeError(f"missing label: {label}")
         nodes, start = self.labels[key]
         self.stack.append(RuntimeFrame(nodes, start + 1))
+
+    def _replace_current_frame(self, label: str) -> None:
+        key = label.upper()
+        if key not in self.labels:
+            raise RuntimeError(f"missing label: {label}")
+        nodes, start = self.labels[key]
+        self.stack[-1] = RuntimeFrame(nodes, start + 1)
 
     def _eval_value(self, expression: str | None) -> int | str:
         if expression is None:
