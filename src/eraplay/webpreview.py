@@ -7,7 +7,7 @@ from urllib.parse import parse_qs, urlparse
 
 from eraplay.project import load_project
 from eraplay.runtime import MiniRuntime
-from eraplay.translation import translate_event_text
+from eraplay.translation import TranslationConfig, TranslationDisplayMode, translate_event_text
 from eraplay.ui import OutputChannel, OutputKind
 
 
@@ -40,7 +40,10 @@ def create_preview_server(
             if parsed.path == "/":
                 self._send_html(PAGE_HTML)
             elif parsed.path == "/state":
-                self._send_json(_runtime_state(runtime, project.config.translation))
+                query = parse_qs(parsed.query)
+                mode = query.get("mode", [None])[0]
+                translation = _translation_with_mode(project.config.translation, mode)
+                self._send_json(_runtime_state(runtime, translation))
             else:
                 self.send_error(404)
 
@@ -55,7 +58,10 @@ def create_preview_server(
             value = data.get("value", [""])[0]
             runtime.console.clear()
             runtime.resume(_coerce_input(value))
-            self._send_json(_runtime_state(runtime, project.config.translation))
+            query = parse_qs(parsed.query)
+            mode = query.get("mode", [None])[0]
+            translation = _translation_with_mode(project.config.translation, mode)
+            self._send_json(_runtime_state(runtime, translation))
 
         def log_message(self, format: str, *args: object) -> None:
             return
@@ -102,7 +108,28 @@ def _runtime_state(runtime: MiniRuntime, translation=None) -> dict[str, object]:
         "actions": actions,
         "history": history,
         "waiting": runtime.state.waiting_for_input,
+        "translation_mode": translation.display_mode.value if translation is not None else "original",
     }
+
+
+def _translation_with_mode(
+    config: TranslationConfig,
+    mode: str | None,
+) -> TranslationConfig:
+    if mode is None:
+        return config
+    return TranslationConfig(
+        enabled=config.enabled,
+        source_language=config.source_language,
+        target_language=config.target_language,
+        provider=config.provider,
+        endpoint=config.endpoint,
+        model=config.model,
+        api_key_env=config.api_key_env,
+        cache=config.cache,
+        display_mode=TranslationDisplayMode(mode),
+        translate_channels=config.translate_channels,
+    )
 
 
 def _coerce_input(value: str) -> int | str:
@@ -123,6 +150,10 @@ PAGE_HTML = """<!doctype html>
     body { margin: 0; background: #080808; color: #d8d8d8; }
     .layout { min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
     header { padding: 10px 14px; border-bottom: 1px solid #333; color: #89dceb; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .modes { display: inline-flex; gap: 6px; }
+    .modes button { padding: 5px 8px; }
+    .modes button.active { background: #39616c; }
     #info { padding: 10px 14px; border-bottom: 1px solid #222; color: #c9f2ff; min-height: 22px; }
     main { display: grid; grid-template-columns: 1fr 320px; min-height: 0; }
     #main { padding: 14px; white-space: pre-wrap; line-height: 1.55; overflow: auto; }
@@ -134,7 +165,14 @@ PAGE_HTML = """<!doctype html>
 </head>
 <body>
   <div class="layout">
-    <header>ERAplay Preview</header>
+    <header>
+      <span>ERAplay Preview</span>
+      <span class="modes">
+        <button data-mode="original">Original</button>
+        <button data-mode="translated">Translated</button>
+        <button data-mode="bilingual">Bilingual</button>
+      </span>
+    </header>
     <section id="info"></section>
     <main>
       <section id="main"></section>
@@ -143,11 +181,15 @@ PAGE_HTML = """<!doctype html>
     <nav id="actions"></nav>
   </div>
   <script>
+    let mode = 'bilingual';
     async function refresh() {
-      const state = await fetch('/state').then(r => r.json());
+      const state = await fetch(`/state?mode=${encodeURIComponent(mode)}`).then(r => r.json());
       document.querySelector('#info').textContent = state.info.join('\\n');
       document.querySelector('#main').textContent = state.main.join('\\n');
       document.querySelector('#history').textContent = state.history.join('\\n');
+      document.querySelectorAll('.modes button').forEach(button => {
+        button.classList.toggle('active', button.dataset.mode === mode);
+      });
       const actions = document.querySelector('#actions');
       actions.replaceChildren(...state.actions.map(action => {
         const button = document.createElement('button');
@@ -163,6 +205,12 @@ PAGE_HTML = """<!doctype html>
         return button;
       }));
     }
+    document.querySelectorAll('.modes button').forEach(button => {
+      button.onclick = async () => {
+        mode = button.dataset.mode;
+        await refresh();
+      };
+    });
     refresh();
   </script>
 </body>
