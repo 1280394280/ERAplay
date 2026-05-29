@@ -7,11 +7,22 @@ from pathlib import Path
 from eraplay.translation import TranslationConfig
 
 CONFIG_FILE_NAME = "eraplay.toml"
+DEFAULT_EXCLUDE_DIRS = (
+    ".git",
+    "__pycache__",
+    "sav",
+    "save",
+    "debug",
+    "resources",
+    "\u8cc7\u6599",
+    "\u9644\u4ef6",
+)
 
 
 @dataclass(frozen=True)
 class ProjectConfig:
     source_encoding: str | None = None
+    exclude_dirs: tuple[str, ...] = DEFAULT_EXCLUDE_DIRS
     translation: TranslationConfig = field(default_factory=TranslationConfig)
 
     @classmethod
@@ -20,6 +31,7 @@ class ProjectConfig:
         translation_data = _table(data, "translation")
         return cls(
             source_encoding=_optional_str(project_data, "source_encoding"),
+            exclude_dirs=_optional_str_tuple(project_data, "exclude_dirs", DEFAULT_EXCLUDE_DIRS),
             translation=TranslationConfig.from_dict(translation_data),
         )
 
@@ -35,6 +47,7 @@ def load_project_config(root: str | Path) -> ProjectConfig:
 def default_config_text(source_encoding: str = "utf-8") -> str:
     return f"""[project]
 source_encoding = "{source_encoding}"
+exclude_dirs = [".git", "__pycache__", "sav", "save", "debug", "resources", "資料", "附件"]
 
 [translation]
 enabled = false
@@ -74,3 +87,21 @@ def _optional_str(data: dict[str, object], key: str) -> str | None:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"config field '{key}' must be a non-empty string")
     return value
+
+
+def _optional_str_tuple(
+    data: dict[str, object],
+    key: str,
+    default: tuple[str, ...],
+) -> tuple[str, ...]:
+    value = data.get(key)
+    if value is None:
+        return default
+    if not isinstance(value, list):
+        raise ValueError(f"config field '{key}' must be a list of strings")
+    result: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or not item.strip():
+            raise ValueError(f"config field '{key}' must be a list of non-empty strings")
+        result.append(item)
+    return tuple(result)

@@ -52,13 +52,16 @@ def load_project(
     config = load_project_config(root_path)
     encoding = preferred_encoding or config.source_encoding
     erb_files = tuple(
-        _load_erb(path, encoding) for path in _glob_case_insensitive(root_path, "*.erb")
+        _load_erb(path, encoding)
+        for path in _glob_case_insensitive(root_path, "*.erb", config.exclude_dirs)
     )
     erh_files = tuple(
-        _load_erh(path, encoding) for path in _glob_case_insensitive(root_path, "*.erh")
+        _load_erh(path, encoding)
+        for path in _glob_case_insensitive(root_path, "*.erh", config.exclude_dirs)
     )
     csv_files = tuple(
-        _load_csv(path, encoding) for path in _glob_case_insensitive(root_path, "*.csv")
+        _load_csv(path, encoding)
+        for path in _glob_case_insensitive(root_path, "*.csv", config.exclude_dirs)
     )
     return EraProject(root_path, config, erb_files, erh_files, csv_files)
 
@@ -82,6 +85,21 @@ def _load_csv(path: Path, preferred_encoding: str | None) -> LoadedCsv:
     return LoadedCsv(loaded, parse_csv_source(loaded.decoded.text))
 
 
-def _glob_case_insensitive(root: Path, pattern: str) -> list[Path]:
+def _glob_case_insensitive(root: Path, pattern: str, exclude_dirs: tuple[str, ...]) -> list[Path]:
     suffix = pattern.removeprefix("*").lower()
-    return sorted(path for path in root.rglob("*") if path.is_file() and path.suffix.lower() == suffix)
+    return sorted(
+        path
+        for path in root.rglob("*")
+        if path.is_file()
+        and path.suffix.lower() == suffix
+        and not _is_excluded(path, root, exclude_dirs)
+    )
+
+
+def _is_excluded(path: Path, root: Path, exclude_dirs: tuple[str, ...]) -> bool:
+    excluded = {name.casefold() for name in exclude_dirs}
+    try:
+        relative_parts = path.relative_to(root).parts[:-1]
+    except ValueError:
+        relative_parts = path.parts[:-1]
+    return any(part.casefold() in excluded for part in relative_parts)

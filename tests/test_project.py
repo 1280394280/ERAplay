@@ -33,3 +33,31 @@ def test_load_fixture_project() -> None:
 
     csv_names = [loaded.file.path.name for loaded in project.csv_files]
     assert csv_names == ["Chara0000.csv", "GameBase.csv"]
+
+
+def test_load_project_excludes_default_non_source_dirs(tmp_path: Path) -> None:
+    (tmp_path / "ERB").mkdir()
+    (tmp_path / "\u8cc7\u6599").mkdir()
+    (tmp_path / "\u9644\u4ef6").mkdir()
+    (tmp_path / "ERB" / "main.erb").write_text("@EVENTFIRST\n", encoding="utf-8")
+    (tmp_path / "\u8cc7\u6599" / "template.erb").write_text("@EVENTFIRST\n", encoding="utf-8")
+    (tmp_path / "\u9644\u4ef6" / "patch.erb").write_text("@EVENTFIRST\n", encoding="utf-8")
+
+    project = load_project(tmp_path)
+
+    assert [loaded.file.path.name for loaded in project.erb_files] == ["main.erb"]
+
+
+def test_load_project_can_override_exclude_dirs(tmp_path: Path) -> None:
+    (tmp_path / "eraplay.toml").write_text(
+        '[project]\nsource_encoding = "utf-8"\nexclude_dirs = ["backup"]\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "ERB").mkdir()
+    (tmp_path / "backup").mkdir()
+    (tmp_path / "ERB" / "main.erb").write_text("@EVENTFIRST\n", encoding="utf-8")
+    (tmp_path / "backup" / "old.erb").write_text("@OLD\n", encoding="utf-8")
+
+    project = load_project(tmp_path)
+
+    assert [loaded.file.path.name for loaded in project.erb_files] == ["main.erb"]
