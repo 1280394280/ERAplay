@@ -18,12 +18,14 @@ class PreviewSession:
     entry: str
     encoding: str | None = None
     runtime: MiniRuntime | None = None
+    log: list[str] | None = None
 
     def start(self) -> MiniRuntime:
         project = load_project(self.project_path, preferred_encoding=self.encoding)
         runtime = MiniRuntime(project)
         runtime.run(self.entry)
         self.runtime = runtime
+        self.log = [f"started entry={self.entry}"]
         return runtime
 
     def current(self) -> MiniRuntime:
@@ -32,7 +34,14 @@ class PreviewSession:
         return self.runtime
 
     def restart(self) -> MiniRuntime:
-        return self.start()
+        runtime = self.start()
+        self.add_log("restarted")
+        return runtime
+
+    def add_log(self, message: str) -> None:
+        if self.log is None:
+            self.log = []
+        self.log.append(message)
 
 
 def serve_preview(
@@ -67,7 +76,7 @@ def create_preview_server(
                 mode = query.get("mode", [None])[0]
                 runtime = session.current()
                 translation = _translation_with_mode(runtime.project.config.translation, mode)
-                self._send_json(_runtime_state(runtime, translation))
+                self._send_json(_runtime_state(runtime, translation, session.log or []))
             else:
                 self.send_error(404)
 
@@ -81,19 +90,19 @@ def create_preview_server(
                 query = parse_qs(parsed.query)
                 mode = query.get("mode", [None])[0]
                 translation = _translation_with_mode(runtime.project.config.translation, mode)
-                self._send_json(_runtime_state(runtime, translation))
+                self._send_json(_runtime_state(runtime, translation, session.log or []))
                 return
             length = int(self.headers.get("content-length", "0"))
             body = self.rfile.read(length).decode("utf-8")
-            data = parse_qs(body)
-            value = data.get("value", [""])[0]
+            value = _input_value_from_body(body, self.headers.get("content-type", ""))
+            session.add_log(f"input value={value}")
             runtime = session.current()
             runtime.console.clear()
             runtime.resume(_coerce_input(value))
             query = parse_qs(parsed.query)
             mode = query.get("mode", [None])[0]
             translation = _translation_with_mode(runtime.project.config.translation, mode)
-            self._send_json(_runtime_state(runtime, translation))
+            self._send_json(_runtime_state(runtime, translation, session.log or []))
 
         def log_message(self, format: str, *args: object) -> None:
             return
@@ -120,7 +129,11 @@ def create_preview_server(
     return server
 
 
-def _runtime_state(runtime: MiniRuntime, translation=None) -> dict[str, object]:
+def _runtime_state(
+    runtime: MiniRuntime,
+    translation=None,
+    event_log: list[str] | None = None,
+) -> dict[str, object]:
     info: list[str] = [_status_line(runtime)]
     main: list[str] = []
     actions: list[dict[str, str]] = []
@@ -147,6 +160,7 @@ def _runtime_state(runtime: MiniRuntime, translation=None) -> dict[str, object]:
             "steps": runtime.state.steps,
             "result": runtime.state.result,
         },
+        "log": event_log or [],
     }
 
 
@@ -177,6 +191,18 @@ def _coerce_input(value: str) -> int | str:
     return value
 
 
+def _input_value_from_body(body: str, content_type: str) -> str:
+    if "application/json" in content_type:
+        try:
+            payload = json.loads(body or "{}")
+        except json.JSONDecodeError:
+            return ""
+        value = payload.get("value", "") if isinstance(payload, dict) else ""
+        return str(value)
+    data = parse_qs(body)
+    return data.get("value", [""])[0]
+
+
 def _status_line(runtime: MiniRuntime) -> str:
     waiting = "waiting" if runtime.state.waiting_for_input else "running"
     result = "" if runtime.state.result is None else str(runtime.state.result)
@@ -200,9 +226,11 @@ PAGE_HTML = """<!doctype html>
     .modes button { padding: 5px 8px; }
     .modes button.active { background: #39616c; }
     #info { padding: 10px 14px; border-bottom: 1px solid #222; color: #c9f2ff; min-height: 22px; font-size: 13px; }
-    main { display: grid; grid-template-columns: 1fr 320px; min-height: 0; }
+    main { display: grid; grid-template-columns: 1fr 360px; min-height: 0; }
     #main { padding: 14px; white-space: pre-wrap; line-height: 1.55; overflow: auto; }
-    #history { padding: 14px; border-left: 1px solid #333; color: #888; overflow: auto; white-space: pre-wrap; }
+    aside { border-left: 1px solid #333; display: grid; grid-template-rows: 1fr 160px; min-height: 0; }
+    #history { padding: 14px; color: #888; overflow: auto; white-space: pre-wrap; }
+    #log { padding: 10px 14px; border-top: 1px solid #333; color: #8ab4f8; overflow: auto; white-space: pre-wrap; font-size: 12px; }
     #actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px; border-top: 1px solid #333; min-height: 44px; }
     button { background: #1b2a2f; color: #e8f8ff; border: 1px solid #39616c; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
     button:hover { background: #24404a; }
@@ -224,7 +252,10 @@ PAGE_HTML = """<!doctype html>
     <section id="info"></section>
     <main>
       <section id="main"></section>
-      <aside id="history"></aside>
+      <aside>
+        <section id="history"></section>
+        <section id="log"></section>
+      </aside>
     </main>
     <nav id="actions"></nav>
   </div>
@@ -235,6 +266,7 @@ PAGE_HTML = """<!doctype html>
       document.querySelector('#info').textContent = state.info.join('\\n');
       document.querySelector('#main').textContent = state.main.join('\\n');
       document.querySelector('#history').textContent = state.history.join('\\n');
+      document.querySelector('#log').textContent = state.log.join('\\n');
       document.querySelectorAll('.modes button').forEach(button => {
         button.classList.toggle('active', button.dataset.mode === mode);
       });
