@@ -10,6 +10,7 @@ from eraplay.project import EraProject
 
 class SymbolKind(str, Enum):
     LABEL = "label"
+    LOCAL_LABEL = "local_label"
     VARIABLE = "variable"
     DEFINE = "define"
     CSV_KEY = "csv_key"
@@ -53,8 +54,11 @@ def _index_erb(project: EraProject) -> list[Symbol]:
     for loaded in project.erb_files:
         for node in loaded.program.nodes:
             if isinstance(node, Label):
-                detail = "event" if node.is_event else "function"
-                symbols.append(Symbol(node.name, SymbolKind.LABEL, node.span, detail))
+                if node.is_local:
+                    symbols.append(Symbol(node.name, SymbolKind.LOCAL_LABEL, node.span, "local"))
+                else:
+                    detail = "event" if node.is_event else "function"
+                    symbols.append(Symbol(node.name, SymbolKind.LABEL, node.span, detail))
             elif isinstance(node, Assignment):
                 variable_name = _base_variable_name(node.target)
                 key = (node.span.file, variable_name.upper())

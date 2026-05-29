@@ -42,7 +42,8 @@ def parse_line(line: LogicalLine) -> Node:
     upper = text.upper()
 
     if text.startswith("@") or text.startswith("$"):
-        return Label(line.span, text[1:].strip(), text.startswith("@"))
+        name, args = _split_label_name_args(text[1:].strip())
+        return Label(line.span, name, name.upper().startswith("EVENT"), text.startswith("$"), args)
 
     if upper == "ELSE":
         return ElseBlock(line.span)
@@ -96,6 +97,10 @@ def _split_head_args(text: str, span: SourceSpan) -> tuple[str, tuple[str, ...]]
     if not text:
         raise EraPlaySyntaxError(Diagnostic("expected command or label content", span))
 
+    paren_args = _split_parenthesized_head_args(text)
+    if paren_args is not None:
+        return paren_args
+
     split_at = _find_head_end(text)
     if split_at is None:
         return text.strip(), ()
@@ -108,10 +113,63 @@ def _split_head_args(text: str, span: SourceSpan) -> tuple[str, tuple[str, ...]]
     return head, tuple(part.strip() for part in _split_csv_like(tail) if part.strip())
 
 
+def _split_label_name_args(text: str) -> tuple[str, tuple[str, ...]]:
+    split = _split_parenthesized_head_args(text)
+    if split is not None:
+        return split
+    return text, ()
+
+
 def _find_head_end(text: str) -> int | None:
     for index, char in enumerate(text):
         if char.isspace() or char == ",":
             return index
+    return None
+
+
+def _split_parenthesized_head_args(text: str) -> tuple[str, tuple[str, ...]] | None:
+    head_end = text.find("(")
+    if head_end <= 0:
+        return None
+    head = text[:head_end].strip()
+    if not head or any(char.isspace() or char == "," for char in head):
+        return None
+    close = _find_matching_paren(text, head_end)
+    if close is None:
+        return None
+    tail = text[close + 1 :].strip()
+    if tail and not tail.startswith(","):
+        return None
+    arg_text = text[head_end + 1 : close]
+    if tail.startswith(","):
+        arg_text = f"{arg_text},{tail[1:].strip()}"
+    args = tuple(part.strip() for part in _split_csv_like(arg_text) if part.strip())
+    return head, args
+
+
+def _find_matching_paren(text: str, open_index: int) -> int | None:
+    depth = 0
+    in_string = False
+    escaped = False
+    for index in range(open_index, len(text)):
+        char = text[index]
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\":
+            escaped = True
+            continue
+        if char == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                return index
     return None
 
 

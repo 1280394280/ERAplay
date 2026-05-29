@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from eraplay.ast import Call, Goto, SourceSpan
+from eraplay.ast import Call, Goto, Label, SourceSpan
 from eraplay.diagnostics import Diagnostic
 from eraplay.index import ProjectIndex, SymbolKind, build_project_index
 from eraplay.project import EraProject
@@ -51,11 +51,23 @@ def _diagnose_unresolved_jumps(project: EraProject, index: ProjectIndex) -> list
                 diagnostics.append(
                     Diagnostic(f"unresolved CALL target '{node.target}'", node.span, "error")
                 )
-            elif isinstance(node, Goto) and not index.find(node.target, SymbolKind.LABEL):
+            elif (
+                isinstance(node, Goto)
+                and not index.find(node.target, SymbolKind.LABEL)
+                and not _has_local_label(loaded.program.nodes, node.target)
+            ):
                 diagnostics.append(
                     Diagnostic(f"unresolved GOTO/JUMP target '{node.target}'", node.span, "error")
                 )
     return diagnostics
+
+
+def _has_local_label(nodes: tuple[object, ...], target: str) -> bool:
+    normalized = target.upper()
+    return any(
+        isinstance(node, Label) and node.is_local and node.name.upper() == normalized
+        for node in nodes
+    )
 
 
 def _diagnose_erh_declarations(project: EraProject) -> list[Diagnostic]:

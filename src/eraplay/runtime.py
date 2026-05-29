@@ -89,6 +89,9 @@ class MiniRuntime:
                 continue
             node = frame.nodes[frame.index]
             if isinstance(node, Label):
+                if node.is_local:
+                    frame.index += 1
+                    continue
                 self.stack.pop()
                 continue
             if isinstance(node, Return):
@@ -150,6 +153,10 @@ class MiniRuntime:
         self.stack.append(RuntimeFrame(nodes, start + 1))
 
     def _replace_current_frame(self, label: str) -> None:
+        local_index = self._find_local_label(self.stack[-1].nodes, label)
+        if local_index is not None:
+            self.stack[-1].index = local_index + 1
+            return
         key = label.upper()
         if key not in self.labels:
             raise RuntimeError(f"missing label: {label}")
@@ -259,9 +266,17 @@ class MiniRuntime:
         for loaded in project.erb_files:
             nodes = loaded.program.nodes
             for index, node in enumerate(nodes):
-                if isinstance(node, Label):
+                if isinstance(node, Label) and not node.is_local:
                     labels.setdefault(node.name.upper(), (nodes, index))
         return labels
+
+    @staticmethod
+    def _find_local_label(nodes: tuple[Node, ...], label: str) -> int | None:
+        normalized = label.upper()
+        for index, node in enumerate(nodes):
+            if isinstance(node, Label) and node.is_local and node.name.upper() == normalized:
+                return index
+        return None
 
 
 def run_project(project: EraProject, entry: str = "EVENTFIRST") -> RuntimeResult:

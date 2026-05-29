@@ -21,7 +21,7 @@ def test_runtime_calls_function_label(tmp_path: Path) -> None:
 CALL GREET
 PRINTL "done"
 
-$GREET
+@GREET
 PRINTL "hello"
 RETURN 0
 """,
@@ -181,7 +181,7 @@ def test_runtime_resumes_after_input_inside_call(tmp_path: Path) -> None:
 CALL CHOOSE
 PRINTL "returned"
 
-$CHOOSE
+@CHOOSE
 PRINTL "[2] 診察"
 INPUT
 RETURN RESULT

@@ -37,12 +37,23 @@ class Node:
 class Label(Node):
     name: str
     is_event: bool
+    is_local: bool
+    args: tuple[str, ...] = field(default_factory=tuple)
 
-    def __init__(self, span: SourceSpan, name: str, is_event: bool) -> None:
+    def __init__(
+        self,
+        span: SourceSpan,
+        name: str,
+        is_event: bool,
+        is_local: bool = False,
+        args: tuple[str, ...] = (),
+    ) -> None:
         object.__setattr__(self, "kind", NodeKind.LABEL)
         object.__setattr__(self, "span", span)
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "is_event", is_event)
+        object.__setattr__(self, "is_local", is_local)
+        object.__setattr__(self, "args", args)
 
 
 @dataclass(frozen=True)
