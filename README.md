@@ -69,6 +69,12 @@ Try the included menu demo:
 eraplay play D:\work\py\ERAplay\fixtures --entry DEMO_MENU
 ```
 
+Open a local web preview:
+
+```powershell
+eraplay web D:\work\py\ERAplay\fixtures --entry DEMO_MENU
+```
+
 ## Reference Sources
 
 The local sibling projects are used as references only:

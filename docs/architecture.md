@@ -144,6 +144,7 @@ eraplay symbols <project>
 eraplay init <project>
 eraplay run <project>
 eraplay play <project>
+eraplay web <project>
 ```
 
 `check` loads the project, builds the index, runs diagnostics, and exits with
@@ -161,6 +162,8 @@ loader/parser/console stack can produce visible output from a project.
 
 `play` wraps the minimal runtime with a terminal loop: it prints visible output,
 lists detected action events, reads a choice, and resumes execution.
+`web` serves the same runtime through a tiny local HTTP preview with main,
+history, and action regions.
 
 The fixture project includes `@DEMO_MENU`, a tiny input/selectcase flow used as
 the first interactive smoke test.

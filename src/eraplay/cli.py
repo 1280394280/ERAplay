@@ -11,6 +11,7 @@ from eraplay.index import SymbolKind, build_project_index
 from eraplay.project import load_project
 from eraplay.runtime import MiniRuntime, run_project
 from eraplay.ui import OutputChannel, OutputKind
+from eraplay.webpreview import serve_preview
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -190,6 +191,19 @@ def _build_parser() -> argparse.ArgumentParser:
         help="preferred source encoding, for example utf-8, cp932, cp950, or cp936",
     )
     play.set_defaults(handler=lambda args: play_project(args.path, args.entry, args.encoding))
+
+    web = subparsers.add_parser("web", help="serve a minimal local web preview")
+    web.add_argument("path", help="project directory to preview")
+    web.add_argument("--entry", default="DEMO_MENU", help="entry label to run")
+    web.add_argument("--host", default="127.0.0.1", help="host to bind")
+    web.add_argument("--port", type=int, default=8765, help="port to bind")
+    web.add_argument(
+        "--encoding",
+        help="preferred source encoding, for example utf-8, cp932, cp950, or cp936",
+    )
+    web.set_defaults(
+        handler=lambda args: serve_preview(args.path, args.entry, args.host, args.port, args.encoding)
+    )
     return parser
 
 
