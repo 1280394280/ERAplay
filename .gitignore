@@ -8,3 +8,5 @@ dist/
 *.egg-info/
 .eraplay-web.pid
 eraplay-web.*.log
+eraplay-erav.pid
+eraplay-erav.*.log
