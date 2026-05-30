@@ -73,3 +73,13 @@ def test_classic_console_classifies_multiple_actions_on_one_line() -> None:
         ("101", "物色人才"),
         ("102", "成人商店"),
     ]
+
+
+def test_classic_console_stops_action_text_at_any_next_bracket() -> None:
+    console = ClassicConsoleBuffer()
+
+    console.print_line("[109] - Visit [---] - -----")
+
+    events = console.to_events()
+
+    assert [(event.choice_id, event.text) for event in events] == [("109", "Visit")]

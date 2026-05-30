@@ -79,14 +79,17 @@ def _trim_trailing_empty(lines: list[str]) -> list[str]:
 
 
 def _parse_action_line(line: str) -> list[OutputEvent]:
-    matches = list(re.finditer(r"\[(\d+)]", line))
+    brackets = list(re.finditer(r"\[([^\]]+)]", line))
     actions: list[OutputEvent] = []
-    for index, match in enumerate(matches):
+    for index, match in enumerate(brackets):
+        choice_id = match.group(1).strip()
+        if not choice_id.isdigit():
+            continue
         start = match.end()
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(line)
+        end = brackets[index + 1].start() if index + 1 < len(brackets) else len(line)
         text = line[start:end].strip()
         if text.startswith("-"):
             text = text[1:].strip()
         if text:
-            actions.append(make_action(match.group(1), text))
+            actions.append(make_action(choice_id, text))
     return actions
