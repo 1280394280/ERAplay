@@ -123,6 +123,31 @@ def test_real_project_name_decision_advances_to_next_prompt() -> None:
     assert _action_ids(runtime)[-3:] == [0, 1, 2]
 
 
+def test_real_project_can_reach_shop_menu_after_opening_choices() -> None:
+    project = _load_real_project()
+    runtime = MiniRuntime(project, max_steps=20000)
+
+    runtime.run("__TITLE__")
+    runtime.resume(0)
+    runtime.resume()
+    runtime.resume(1)
+    runtime.resume(0)
+    runtime.resume(0)
+    runtime.resume(0)
+
+    text = runtime.console.visible_text()
+    assert runtime.state.waiting_for_input
+    assert runtime.state.waiting_reason == "shop"
+    assert "begin target=SHOP" in runtime.trace
+    assert "shop input waiting" in runtime.trace
+    assert any(action in text for action in ("[105]", "[200]", "[400]"))
+
+    runtime.resume(0)
+
+    assert runtime.state.waiting_for_input
+    assert runtime.state.waiting_reason == "shop"
+
+
 def _action_ids(runtime: MiniRuntime) -> list[int]:
     return [
         int(event.choice_id)

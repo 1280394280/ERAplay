@@ -72,6 +72,28 @@ def test_webpreview_continue_wait_has_continue_action(tmp_path: Path) -> None:
     assert state["actions"] == [{"id": "", "text": "\u7ee7\u7eed"}]
 
 
+def test_webpreview_shop_wait_keeps_menu_actions(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+BEGIN SHOP
+@SHOW_SHOP
+PRINTL "[105] 什么都不做"
+""",
+        encoding="utf-8",
+    )
+    server = create_preview_server(tmp_path, entry="EVENTFIRST", port=0)
+    try:
+        runtime = server.session.current()
+        state = _runtime_state(runtime, runtime.project.config.translation, server.session.log)
+    finally:
+        server.server_close()
+
+    assert state["waiting"] is True
+    assert state["status"]["waiting_reason"] == "shop"
+    assert {"id": "105", "text": "什么都不做"} in state["actions"]
+
+
 def test_webpreview_translation_mode_override() -> None:
     server = create_preview_server(ROOT / "fixtures", entry="DEMO_MENU", port=0)
     try:

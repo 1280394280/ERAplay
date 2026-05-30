@@ -60,3 +60,16 @@ def test_classic_console_classifies_action_lines() -> None:
     assert events[0].kind is OutputKind.ACTION
     assert events[0].choice_id == "95"
     assert events[0].text == "思考一下"
+
+
+def test_classic_console_classifies_multiple_actions_on_one_line() -> None:
+    console = ClassicConsoleBuffer()
+
+    console.print_line("[---] - －－－－－－－ [101] - 物色人才　　　　 [102] - 成人商店")
+
+    events = console.to_events()
+
+    assert [(event.choice_id, event.text) for event in events] == [
+        ("101", "物色人才"),
+        ("102", "成人商店"),
+    ]

@@ -58,9 +58,9 @@ class ClassicConsoleBuffer:
     def to_events(self) -> list[OutputEvent]:
         events: list[OutputEvent] = []
         for line in _trim_trailing_empty(self.current_lines):
-            action = _parse_action_line(line)
-            if action is not None:
-                events.append(action)
+            actions = _parse_action_line(line)
+            if actions:
+                events.extend(actions)
             else:
                 events.append(OutputEvent(OutputChannel.MAIN, OutputKind.LINE, line))
         for line in _trim_trailing_empty(self.history_lines):
@@ -78,8 +78,15 @@ def _trim_trailing_empty(lines: list[str]) -> list[str]:
     return trimmed
 
 
-def _parse_action_line(line: str) -> OutputEvent | None:
-    match = re.match(r"^\[(\d+)]\s*(.+)$", line.strip())
-    if match is None:
-        return None
-    return make_action(match.group(1), match.group(2))
+def _parse_action_line(line: str) -> list[OutputEvent]:
+    matches = list(re.finditer(r"\[(\d+)]", line))
+    actions: list[OutputEvent] = []
+    for index, match in enumerate(matches):
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(line)
+        text = line[start:end].strip()
+        if text.startswith("-"):
+            text = text[1:].strip()
+        if text:
+            actions.append(make_action(match.group(1), text))
+    return actions

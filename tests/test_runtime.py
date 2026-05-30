@@ -420,6 +420,116 @@ PRINTL "after"
     assert result.console.visible_text() == "after"
 
 
+def test_runtime_begin_shop_calls_shop_hooks_and_waits_for_menu_input(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+PRINTL "opening"
+BEGIN SHOP
+PRINTL "skipped"
+
+@EVENTSHOP
+PRINTL "shop setup"
+
+@SHOW_SHOP
+PRINTL "[105] 什么都不做"
+
+@USERSHOP
+PRINTL "shop choice"
+RETURN 0
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+    runtime = MiniRuntime(project)
+
+    runtime.run()
+
+    assert runtime.state.waiting_for_input is True
+    assert runtime.state.waiting_reason == "shop"
+    assert runtime.console.visible_text() == "opening\nshop setup\n[105] 什么都不做"
+    assert "begin target=SHOP" in runtime.trace
+    assert "shop input waiting" in runtime.trace
+
+    runtime.resume(105)
+
+    assert runtime.state.variables["RESULT"] == 105
+    assert runtime.state.waiting_reason == "shop"
+    assert "shop choice" in runtime.console.visible_text()
+
+
+def test_runtime_begin_shop_runs_duplicate_eventshop_hooks(tmp_path: Path) -> None:
+    (tmp_path / "a.erb").write_text(
+        """
+@EVENTFIRST
+BEGIN SHOP
+
+@EVENTSHOP
+PRINTL "first hook"
+""",
+        encoding="utf-8",
+    )
+    (tmp_path / "b.erb").write_text(
+        """
+@EVENTSHOP
+PRINTL "second hook"
+
+@SHOW_SHOP
+PRINTL "[105] menu"
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+    runtime = MiniRuntime(project)
+
+    runtime.run()
+
+    assert runtime.state.waiting_reason == "shop"
+    assert runtime.console.visible_text() == "first hook\nsecond hook\n[105] menu"
+
+
+def test_runtime_sif_skips_next_command_when_false(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+BOUGHT = -1
+SIF BOUGHT >= 0
+JUMP ITEM_SHOP
+PRINTL "shop menu"
+
+@ITEM_SHOP
+PRINTL "item shop"
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+
+    result = run_project(project)
+
+    assert result.console.visible_text() == "shop menu"
+
+
+def test_runtime_sif_keeps_next_command_when_true(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+BOUGHT = 1
+SIF BOUGHT >= 0
+JUMP ITEM_SHOP
+PRINTL "shop menu"
+
+@ITEM_SHOP
+PRINTL "item shop"
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+
+    result = run_project(project)
+
+    assert result.console.visible_text() == "item shop"
+
+
 def test_runtime_step_limit_stops_runaway_loop(tmp_path: Path) -> None:
     (tmp_path / "main.erb").write_text(
         """

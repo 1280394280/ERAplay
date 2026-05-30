@@ -43,6 +43,7 @@ class RuntimeResult:
 class RuntimeFrame:
     nodes: tuple[Node, ...]
     index: int
+    wait_after: str | None = None
 
 
 class RuntimeError(Exception):
@@ -54,12 +55,14 @@ class MiniRuntime:
         self.project = project
         self.console = ClassicConsoleBuffer()
         self.state = RuntimeState()
-        self.labels = self._collect_labels(project)
+        self.label_entries = self._collect_label_entries(project)
+        self.labels = {key: entries[0] for key, entries in self.label_entries.items()}
         self.stack: list[RuntimeFrame] = []
         self.max_steps = max_steps
         self.max_trace = max_trace
         self.trace: list[str] = []
         self._startup_waiting = False
+        self._shop_waiting = False
 
     def run(self, entry: str = "EVENTFIRST") -> RuntimeResult:
         if _is_startup_entry(entry):
@@ -82,6 +85,10 @@ class MiniRuntime:
             self._startup_waiting = False
             self._resume_startup(value)
             return RuntimeResult(self.console, self.state)
+        if self._shop_waiting:
+            self._shop_waiting = False
+            self._resume_shop(value)
+            return RuntimeResult(self.console, self.state)
         self._run_until_wait()
         return RuntimeResult(self.console, self.state)
 
@@ -102,14 +109,16 @@ class MiniRuntime:
                 raise RuntimeError(f"runtime step limit exceeded: {self.max_steps}")
             frame = self.stack[-1]
             if frame.index >= len(frame.nodes):
-                self.stack.pop()
+                finished = self.stack.pop()
+                self._wait_after_frame(finished)
                 continue
             node = frame.nodes[frame.index]
             if isinstance(node, Label):
                 if node.is_local:
                     frame.index += 1
                     continue
-                self.stack.pop()
+                finished = self.stack.pop()
+                self._wait_after_frame(finished)
                 continue
             if isinstance(node, Return):
                 self.state.result = self._eval_value(node.expression) if node.expression else None
@@ -143,6 +152,9 @@ class MiniRuntime:
             self._trace(f"goto target={node.target}")
             self._replace_current_frame(node.target)
             return self.stack[-1].index
+        if isinstance(node, Command) and node.name == "SIF":
+            condition = " ".join(node.args)
+            return index + 1 if self._eval_condition(condition) else index + 2
         self._execute_node(node)
         return index + 1
 
@@ -158,7 +170,7 @@ class MiniRuntime:
             self.console.print(self._format_text(text))
         elif command.name == "PRINTL":
             self.console.print_line(self._format_text(text))
-        elif command.name in {"PRINTFORM", "PRINTPLAINFORM"}:
+        elif command.name in {"PRINTFORM", "PRINTPLAIN", "PRINTPLAINFORM"}:
             self.console.print(self._format_text(text))
         elif command.name == "PRINTFORML":
             self.console.print_line(self._format_text(text))
@@ -173,6 +185,8 @@ class MiniRuntime:
             self._execute_dim(command)
         elif command.name == "WAIT":
             self._wait_for_continue("wait")
+        elif command.name == "BEGIN":
+            self._begin(command)
         elif command.name == "INPUT":
             self._trace("input waiting")
             self.state.waiting_for_input = True
@@ -186,12 +200,34 @@ class MiniRuntime:
         self.state.waiting_for_input = True
         self.state.waiting_reason = "continue"
 
-    def _push_call(self, label: str) -> None:
+    def _begin(self, command: Command) -> None:
+        target = command.args[0].upper() if command.args else ""
+        if target == "SHOP":
+            self._trace("begin target=SHOP")
+            self.stack.clear()
+            self._push_call("SHOW_SHOP", wait_after="shop")
+            self._push_all_calls("EVENTSHOP")
+            return
+        self._trace(f"ignored begin={target}")
+
+    def _push_call(self, label: str, wait_after: str | None = None) -> None:
         key = label.upper()
         if key not in self.labels:
             raise RuntimeError(f"missing label: {label}")
         nodes, start = self.labels[key]
-        self.stack.append(RuntimeFrame(nodes, start + 1))
+        self.stack.append(RuntimeFrame(nodes, start + 1, wait_after))
+
+    def _push_all_calls(self, label: str) -> None:
+        key = label.upper()
+        for nodes, start in reversed(self.label_entries.get(key, ())):
+            self.stack.append(RuntimeFrame(nodes, start + 1))
+
+    def _wait_after_frame(self, frame: RuntimeFrame) -> None:
+        if frame.wait_after == "shop":
+            self._trace("shop input waiting")
+            self.state.waiting_for_input = True
+            self.state.waiting_reason = "shop"
+            self._shop_waiting = True
 
     def _replace_current_frame(self, label: str) -> None:
         local_index = self._find_local_label(self.stack[-1].nodes, label)
@@ -296,6 +332,19 @@ class MiniRuntime:
         self.state.waiting_reason = "startup"
         self._startup_waiting = True
 
+    def _resume_shop(self, value: int | str | None) -> None:
+        if "SHOW_SHOP" in self.labels:
+            self._push_call("SHOW_SHOP", wait_after="shop")
+        if "USERSHOP" in self.labels:
+            self._trace("shop target=USERSHOP")
+            self._push_call("USERSHOP")
+            self._run_until_wait()
+            return
+        if "SHOW_SHOP" in self.labels:
+            self._run_until_wait()
+            return
+        self._trace("shop handlers missing")
+
     def _eval_condition(self, expression: str) -> bool:
         expression = expression.strip()
         if _is_parenthesized(expression):
@@ -389,13 +438,17 @@ class MiniRuntime:
 
     @staticmethod
     def _collect_labels(project: EraProject) -> dict[str, tuple[tuple[Node, ...], int]]:
-        labels: dict[str, tuple[tuple[Node, ...], int]] = {}
+        return {key: entries[0] for key, entries in MiniRuntime._collect_label_entries(project).items()}
+
+    @staticmethod
+    def _collect_label_entries(project: EraProject) -> dict[str, tuple[tuple[tuple[Node, ...], int], ...]]:
+        labels: dict[str, list[tuple[tuple[Node, ...], int]]] = {}
         for loaded in project.erb_files:
             nodes = loaded.program.nodes
             for index, node in enumerate(nodes):
                 if isinstance(node, Label) and not node.is_local:
-                    labels.setdefault(node.name.upper(), (nodes, index))
-        return labels
+                    labels.setdefault(node.name.upper(), []).append((nodes, index))
+        return {key: tuple(entries) for key, entries in labels.items()}
 
     @staticmethod
     def _find_local_label(nodes: tuple[Node, ...], label: str) -> int | None:
