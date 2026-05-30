@@ -2,6 +2,7 @@ from pathlib import Path
 
 from eraplay.webpreview import (
     _compat_state,
+    _entry_state,
     _input_value_from_body,
     _query_int,
     _runtime_state,
@@ -135,6 +136,32 @@ def test_webpreview_compat_state_reports_fixture_ok() -> None:
     assert state["status"] == "ok"
     assert state["diagnostics"] == 0
     assert state["files"]["erb"] == 6
+
+
+def test_webpreview_entry_state_lists_candidate_entries() -> None:
+    server = create_preview_server(ROOT / "fixtures", entry="DEMO_MENU", port=0)
+    try:
+        state = _entry_state(server.session.current(), top=5)
+    finally:
+        server.server_close()
+
+    names = [entry["name"] for entry in state["entries"]]
+    assert state["count"] >= 3
+    assert "DEMO_MENU" in names
+
+
+def test_webpreview_entry_state_prioritizes_eventfirst(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        "@HELPER\nRETURN 0\n@EVENTFIRST\nPRINTL \"start\"\n",
+        encoding="utf-8",
+    )
+    server = create_preview_server(tmp_path, entry="EVENTFIRST", port=0)
+    try:
+        state = _entry_state(server.session.current(), top=2)
+    finally:
+        server.server_close()
+
+    assert state["entries"][0]["name"] == "EVENTFIRST"
 
 
 def test_webpreview_query_int_uses_default_for_bad_values() -> None:

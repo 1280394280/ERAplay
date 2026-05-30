@@ -7,6 +7,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from eraplay.compat import build_compatibility_report
+from eraplay.index import SymbolKind, build_project_index
 from eraplay.project import load_project
 from eraplay.runtime import MiniRuntime, RuntimeError as EraRuntimeError
 from eraplay.translation import TranslationConfig, TranslationDisplayMode, translate_event_text
@@ -93,6 +94,11 @@ def create_preview_server(
                 top = _query_int(query, "top", 5)
                 runtime = session.current()
                 self._send_json(_compat_state(runtime, top=top))
+            elif parsed.path == "/entries":
+                query = parse_qs(parsed.query)
+                top = _query_int(query, "top", 20)
+                runtime = session.current()
+                self._send_json(_entry_state(runtime, top=top))
             else:
                 self.send_error(404)
 
@@ -196,6 +202,38 @@ def _compat_state(runtime: MiniRuntime, top: int = 5) -> dict[str, object]:
     return report.to_dict(top=top)
 
 
+def _entry_state(runtime: MiniRuntime, top: int = 20) -> dict[str, object]:
+    index = build_project_index(runtime.project)
+    labels_by_name: dict[str, dict[str, object]] = {}
+    for symbol in index.by_kind(SymbolKind.LABEL):
+        score = _entry_score(symbol.name, symbol.detail)
+        item = {
+            "name": symbol.name,
+            "detail": symbol.detail,
+            "file": symbol.span.file,
+            "line": symbol.span.line,
+            "score": score,
+        }
+        key = symbol.name.upper()
+        current = labels_by_name.get(key)
+        if current is None or score > int(current["score"]):
+            labels_by_name[key] = item
+    labels = list(labels_by_name.values())
+    labels.sort(key=lambda item: (-int(item["score"]), str(item["name"]).upper()))
+    return {"entries": labels[:top], "count": len(labels)}
+
+
+def _entry_score(name: str, detail: str) -> int:
+    upper = name.upper()
+    if upper in {"EVENTFIRST", "SYSTEM_TITLE", "TITLE", "START"}:
+        return 100
+    if upper.startswith(("EVENT", "SYSTEM", "TITLE", "MAIN", "DEMO")):
+        return 80
+    if detail == "event":
+        return 60
+    return 10
+
+
 def _translation_with_mode(
     config: TranslationConfig,
     mode: str | None,
@@ -267,9 +305,10 @@ PAGE_HTML = """<!doctype html>
     #info { padding: 10px 14px; border-bottom: 1px solid #222; color: #c9f2ff; min-height: 22px; font-size: 13px; }
     main { display: grid; grid-template-columns: 1fr 360px; min-height: 0; }
     #main { padding: 14px; white-space: pre-wrap; line-height: 1.55; overflow: auto; }
-    aside { border-left: 1px solid #333; display: grid; grid-template-rows: 1fr 120px 160px; min-height: 0; }
+    aside { border-left: 1px solid #333; display: grid; grid-template-rows: 1fr 120px 120px 160px; min-height: 0; }
     #history { padding: 14px; color: #888; overflow: auto; white-space: pre-wrap; }
     #compat { padding: 10px 14px; border-top: 1px solid #333; color: #d5e5a3; overflow: auto; white-space: pre-wrap; font-size: 12px; }
+    #entries { padding: 10px 14px; border-top: 1px solid #333; color: #f2c078; overflow: auto; white-space: pre-wrap; font-size: 12px; }
     #log { padding: 10px 14px; border-top: 1px solid #333; color: #8ab4f8; overflow: auto; white-space: pre-wrap; font-size: 12px; }
     #actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px; border-top: 1px solid #333; min-height: 44px; }
     button { background: #1b2a2f; color: #e8f8ff; border: 1px solid #39616c; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
@@ -295,6 +334,7 @@ PAGE_HTML = """<!doctype html>
       <aside>
         <section id="history"></section>
         <section id="compat"></section>
+        <section id="entries"></section>
         <section id="log"></section>
       </aside>
     </main>
@@ -332,6 +372,12 @@ PAGE_HTML = """<!doctype html>
       document.querySelector('#compat').textContent =
         `compat=${report.status} diagnostics=${report.diagnostics}` + (calls ? `\\n${calls}` : '');
     }
+    async function refreshEntries() {
+      const report = await fetch('/entries?top=6').then(r => r.json());
+      const entries = report.entries.map(item => `${item.name} (${item.detail})`).join('\\n');
+      document.querySelector('#entries').textContent =
+        `entries=${report.count}` + (entries ? `\\n${entries}` : '');
+    }
     document.querySelectorAll('.modes button').forEach(button => {
       button.onclick = async () => {
         mode = button.dataset.mode;
@@ -344,6 +390,7 @@ PAGE_HTML = """<!doctype html>
     };
     refresh();
     refreshCompat();
+    refreshEntries();
   </script>
 </body>
 </html>
