@@ -146,6 +146,8 @@ class MiniRuntime:
             return index + 1
         if isinstance(node, Call):
             self._trace(f"call target={node.target}")
+            if self._execute_builtin_call(node.target):
+                return index + 1
             self._push_call(node.target)
             return index + 1
         if isinstance(node, Goto):
@@ -169,6 +171,14 @@ class MiniRuntime:
         if command.name == "PRINT":
             self.console.print(self._format_text(text))
         elif command.name == "PRINTL":
+            self.console.print_line(self._format_text(text))
+        elif command.name == "PRINTV":
+            self.console.print(str(self._eval_value(text)))
+        elif command.name == "PRINTVL":
+            self.console.print_line(str(self._eval_value(text)))
+        elif command.name in {"PRINTFORMC", "PRINTC"}:
+            self.console.print(self._format_text(text))
+        elif command.name in {"PRINTFORMLC", "PRINTLC"}:
             self.console.print_line(self._format_text(text))
         elif command.name in {"PRINTFORM", "PRINTPLAIN", "PRINTPLAINFORM"}:
             self.console.print(self._format_text(text))
@@ -261,6 +271,15 @@ class MiniRuntime:
             return "".join(str(value) for value in values)
         return self.state.variables.get(expression.upper(), 0)
 
+    def _eval_int(self, expression: str | None) -> int:
+        value = self._eval_value(expression)
+        if isinstance(value, int):
+            return value
+        try:
+            return int(value)
+        except ValueError:
+            return 0
+
     def _execute_dim(self, command: Command) -> None:
         if not command.args:
             return
@@ -344,6 +363,28 @@ class MiniRuntime:
             self._run_until_wait()
             return
         self._trace("shop handlers missing")
+
+    def _execute_builtin_call(self, target: str) -> bool:
+        if target.upper() == "PRINT_SHOPCHARALIST":
+            self._print_shop_chara_list()
+            return True
+        return False
+
+    def _print_shop_chara_list(self) -> None:
+        item_names = self.project.data.name_tables.get("ITEMNAME", {})
+        prices = self.project.data.item_prices
+        page = self._eval_int("TFLAG:100")
+        start = page * 60 + 100
+        end = start + 60
+        entries = [
+            (index, item_names[index], prices.get(index, 0))
+            for index in range(start, end)
+            if index in item_names
+        ]
+        for offset in range(0, len(entries), 3):
+            row = entries[offset : offset + 3]
+            parts = [f"[{index}] {name} ({price} P)" for index, name, price in row]
+            self.console.print_line("    ".join(parts))
 
     def _eval_condition(self, expression: str) -> bool:
         expression = expression.strip()

@@ -22,6 +22,16 @@ def test_build_era_data_reads_name_tables() -> None:
     assert data.name_tables["ABLNAME"] == {0: "Technique", 1: "Knowledge"}
 
 
+def test_build_era_data_reads_item_prices() -> None:
+    root = Path("game")
+    document = parse_csv_source("100,Demo,500\n101,Other,bad\n102,Third,700\n")
+
+    data = build_era_data(root, (LoadedCsvLike(root / "CSV" / "Item.csv", document),))
+
+    assert data.name_tables["ITEMNAME"] == {100: "Demo", 101: "Other", 102: "Third"}
+    assert data.item_prices == {100: 500, 102: 700}
+
+
 def test_build_era_data_counts_chara_files() -> None:
     root = Path("game")
     document = parse_csv_source("名前,Demo\n")

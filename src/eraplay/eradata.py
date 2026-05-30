@@ -23,6 +23,7 @@ NAME_TABLE_CSV = {
 class EraData:
     variable_sizes: dict[str, int] = field(default_factory=dict)
     name_tables: dict[str, dict[int, str]] = field(default_factory=dict)
+    item_prices: dict[int, int] = field(default_factory=dict)
     chara_files: tuple[Path, ...] = ()
     game_base: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
@@ -36,6 +37,7 @@ class LoadedCsvLike:
 def build_era_data(root: Path, csv_files: tuple[LoadedCsvLike, ...]) -> EraData:
     variable_sizes: dict[str, int] = {}
     name_tables: dict[str, dict[int, str]] = {}
+    item_prices: dict[int, int] = {}
     chara_files: list[Path] = []
     game_base: dict[str, tuple[str, ...]] = {}
 
@@ -47,12 +49,15 @@ def build_era_data(root: Path, csv_files: tuple[LoadedCsvLike, ...]) -> EraData:
             game_base = _parse_game_base(loaded.document)
         if name in NAME_TABLE_CSV:
             name_tables[NAME_TABLE_CSV[name]] = _parse_name_table(loaded.document)
+        if name == "item.csv":
+            item_prices = _parse_item_prices(loaded.document)
         if _is_chara_csv(root, loaded.path):
             chara_files.append(loaded.path)
 
     return EraData(
         variable_sizes=variable_sizes,
         name_tables=name_tables,
+        item_prices=item_prices,
         chara_files=tuple(sorted(chara_files)),
         game_base=game_base,
     )
@@ -80,6 +85,22 @@ def _parse_name_table(document: CsvDocument) -> dict[int, str]:
         if row.values:
             table[index] = row.values[0]
     return table
+
+
+def _parse_item_prices(document: CsvDocument) -> dict[int, int]:
+    prices: dict[int, int] = {}
+    for row in document.rows:
+        try:
+            index = int(row.key)
+        except ValueError:
+            continue
+        if len(row.values) < 2:
+            continue
+        try:
+            prices[index] = int(row.values[1])
+        except ValueError:
+            continue
+    return prices
 
 
 def _parse_game_base(document: CsvDocument) -> dict[str, tuple[str, ...]]:

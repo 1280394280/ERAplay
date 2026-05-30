@@ -148,6 +148,34 @@ def test_real_project_can_reach_shop_menu_after_opening_choices() -> None:
     assert runtime.state.waiting_reason == "shop"
 
 
+def test_real_project_shop_choice_101_enters_chara_buy_page_from_menu() -> None:
+    project = _load_real_project()
+    runtime = MiniRuntime(project, max_steps=20000)
+
+    runtime.run("__TITLE__")
+    runtime.resume(0)
+    runtime.resume()
+    runtime.resume(1)
+    runtime.resume(0)
+    runtime.resume(0)
+    runtime.resume(0)
+
+    assert runtime.state.waiting_reason == "shop"
+
+    runtime.resume(101)
+
+    text = runtime.console.visible_text()
+    assert runtime.state.waiting_for_input
+    assert runtime.state.waiting_reason == "input"
+    assert "shop target=USERSHOP" in runtime.trace
+    assert "call target=CHARA_BUY_NEW" in runtime.trace
+    assert "call target=CHARA_BUY_SHOW_NEW" in runtime.trace
+    assert "物色女优候补人和工作人员" in text
+    assert "[100] 宫间奏 (500 P)" in text
+    assert "[101] 佐佐木美乃里 (500 P)" in text
+    assert "[999] - 返回" in text
+
+
 def _action_ids(runtime: MiniRuntime) -> list[int]:
     return [
         int(event.choice_id)
