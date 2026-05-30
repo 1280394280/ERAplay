@@ -134,7 +134,8 @@ class MiniRuntime:
                 continue
             if isinstance(node, Return):
                 self.state.result = self._eval_value(node.expression) if node.expression else None
-                self.stack.pop()
+                finished = self.stack.pop()
+                self._wait_after_frame(finished)
                 continue
             frame.index = self._execute_at(frame.nodes, frame.index)
 
@@ -176,7 +177,7 @@ class MiniRuntime:
         if isinstance(node, Command):
             self._execute_command(node)
         elif isinstance(node, Assignment):
-            self.state.variables[node.target.upper()] = self._eval_value(node.expression)
+            self.state.variables[self._resolve_variable_key(node.target)] = self._eval_value(node.expression)
 
     def _execute_command(self, command: Command) -> None:
         text = " ".join(command.args)
@@ -256,6 +257,9 @@ class MiniRuntime:
         elif frame.wait_after == "item_shop":
             self._trace("item shop input waiting")
             self._set_waiting("item_shop", "input")
+        elif frame.wait_after == "item_shop_refresh":
+            self._trace("item shop refresh")
+            self._push_call("ITEM_SHOP", wait_after="item_shop")
 
     def _replace_current_frame(self, label: str) -> None:
         local_index = self._find_local_label(self.stack[-1].nodes, label)
@@ -295,7 +299,37 @@ class MiniRuntime:
             if all(isinstance(value, int) for value in values):
                 head, *tail = [int(value) for value in values]
                 return head - sum(tail)
-        return self.state.variables.get(expression.upper(), 0)
+        table_value = self._eval_name_table_value(expression)
+        if table_value is not None:
+            return table_value
+        return self.state.variables.get(self._resolve_variable_key(expression), 0)
+
+    def _eval_name_table_value(self, expression: str) -> str | int | None:
+        head, separator, tail = expression.partition(":")
+        if not separator:
+            return None
+        table_name = head.upper()
+        if table_name == "ITEMPRICE":
+            return self.project.data.item_prices.get(self._eval_int(tail), 0)
+        table = self.project.data.name_tables.get(table_name)
+        if table is None:
+            return None
+        return table.get(self._eval_int(tail), "")
+
+    def _resolve_variable_key(self, expression: str) -> str:
+        parts = [part.strip() for part in expression.split(":")]
+        if len(parts) == 1:
+            return parts[0].upper()
+        resolved = [parts[0].upper()]
+        for part in parts[1:]:
+            part_key = part.upper()
+            if re.fullmatch(r"-?\d+", part):
+                resolved.append(str(int(part)))
+            elif part_key in self.state.variables:
+                resolved.append(str(self._eval_value(part)))
+            else:
+                resolved.append(part_key)
+        return ":".join(resolved)
 
     def _eval_int(self, expression: str | None) -> int:
         value = self._eval_value(expression)
@@ -388,6 +422,14 @@ class MiniRuntime:
         if value == 999 or value == "999":
             self.state.variables["BOUGHT"] = -1
             self._push_call("SHOW_SHOP", wait_after="shop")
+            self._run_until_wait()
+            return
+        item_id = _coerce_int(value)
+        if item_id is not None and self._eval_value(f"ITEMSALES:{item_id}"):
+            self.state.variables["BOUGHT"] = item_id
+            self.state.variables[f"ITEM:{item_id}"] = self._eval_int(f"ITEM:{item_id}") + 1
+            self.state.variables["MONEY"] = self._eval_int("MONEY") - self.project.data.item_prices.get(item_id, 0)
+            self._push_call("EVENTBUY", wait_after="item_shop_refresh")
             self._run_until_wait()
             return
         self._trace(f"item purchase unsupported value={value}")
@@ -535,6 +577,14 @@ def _format_gamebase_version(version: str) -> str:
     if version.isdigit() and len(version) == 3:
         return f"0.{version[:2]}"
     return version
+
+
+def _coerce_int(value: int | str | None) -> int | None:
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and re.fullmatch(r"-?\d+", value.strip()):
+        return int(value)
+    return None
 
 
 def _is_quoted(text: str) -> bool:

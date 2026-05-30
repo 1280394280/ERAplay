@@ -275,6 +275,94 @@ def test_real_project_shop_choice_102_enters_item_shop_and_returns() -> None:
     assert "[102] - 成人商店" in returned_text
 
 
+def test_real_project_item_shop_item_choice_opens_purchase_confirmation() -> None:
+    project = _load_real_project()
+    runtime = MiniRuntime(project, max_steps=50000)
+
+    runtime.run("__TITLE__")
+    runtime.resume(0)
+    runtime.resume()
+    runtime.resume(1)
+    runtime.resume(0)
+    runtime.resume(0)
+    runtime.resume(0)
+    runtime.resume(102)
+    runtime.resume(0)
+
+    text = runtime.console.visible_text()
+    assert runtime.state.waiting_for_input
+    assert runtime.state.waiting_reason == "input"
+    assert runtime.state.variables["BOUGHT"] == 0
+    assert runtime.state.variables["MONEY"] == 800
+    assert runtime.state.variables["ITEM:0"] == 1
+    assert "购入跳蛋是吗？" in text
+    assert "[0] - 是" in text
+    assert "[1] - 否" in text
+
+
+def test_real_project_item_shop_cancel_purchase_restores_money_and_returns() -> None:
+    project = _load_real_project()
+    runtime = MiniRuntime(project, max_steps=50000)
+
+    runtime.run("__TITLE__")
+    runtime.resume(0)
+    runtime.resume()
+    runtime.resume(1)
+    runtime.resume(0)
+    runtime.resume(0)
+    runtime.resume(0)
+    runtime.resume(102)
+    runtime.resume(0)
+    runtime.resume(1)
+
+    text = runtime.console.visible_text()
+    assert runtime.state.waiting_for_input
+    assert runtime.state.waiting_reason == "input"
+    assert runtime.state.input_context is not None
+    assert runtime.state.input_context.kind == "item_shop"
+    assert runtime.state.variables["BOUGHT"] == 0
+    assert runtime.state.variables["MONEY"] == 1000
+    assert runtime.state.variables["ITEM:0"] == 0
+    assert "所持金：1000円" in text
+    assert "[0] 跳蛋($200)" in text
+
+
+def test_real_project_item_shop_confirm_purchase_updates_state_and_refreshes() -> None:
+    project = _load_real_project()
+    runtime = MiniRuntime(project, max_steps=50000)
+
+    runtime.run("__TITLE__")
+    runtime.resume(0)
+    runtime.resume()
+    runtime.resume(1)
+    runtime.resume(0)
+    runtime.resume(0)
+    runtime.resume(0)
+    runtime.resume(102)
+    runtime.resume(0)
+    runtime.resume(0)
+
+    purchase_text = runtime.console.visible_text()
+    assert runtime.state.waiting_for_input
+    assert runtime.state.waiting_reason == "continue"
+    assert runtime.state.variables["MONEY"] == 800
+    assert runtime.state.variables["ITEM:0"] == 1
+    assert "《跳蛋购入了》" in purchase_text
+
+    runtime.resume()
+
+    refreshed_text = runtime.console.visible_text()
+    latest_shop = refreshed_text.rsplit("成人商店", 1)[-1]
+    assert runtime.state.waiting_for_input
+    assert runtime.state.waiting_reason == "input"
+    assert runtime.state.input_context is not None
+    assert runtime.state.input_context.kind == "item_shop"
+    assert "所持金：800円" in latest_shop
+    assert "拥有的物品： 跳蛋(1) 摄像机(1)" in latest_shop
+    assert "[0] 跳蛋($200)" not in latest_shop
+    assert "[1] 按摩棒($500)" in latest_shop
+
+
 def _action_ids(runtime: MiniRuntime) -> list[int]:
     return [
         int(event.choice_id)
