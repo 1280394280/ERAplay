@@ -10,6 +10,7 @@ from eraplay.cli import (
     main,
     play_project,
     run_entry,
+    summarize_emuera_log,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -138,6 +139,29 @@ def test_main_compat_json_command(tmp_path: Path) -> None:
     (tmp_path / "main.erb").write_text("@EVENTFIRST\nCALL MISSING\n", encoding="utf-8")
 
     assert main(["compat", str(tmp_path), "--format", "json"]) == 0
+
+
+def test_summarize_emuera_log(tmp_path: Path) -> None:
+    log_path = tmp_path / "emuera.log"
+    log_path.write_text(
+        "VariableSize.CSV读取中・・・\n载入完毕\nErav\n[0] 新的开始\n",
+        encoding="utf-16",
+    )
+    out = StringIO()
+
+    exit_code = summarize_emuera_log(log_path, out=out)
+    text = out.getvalue()
+
+    assert exit_code == 0
+    assert "Loaded: 0 ERB, 0 ERH, 1 CSV" in text
+    assert "[startup screen]" in text
+
+
+def test_main_log_command(tmp_path: Path) -> None:
+    log_path = tmp_path / "emuera.log"
+    log_path.write_text("载入完毕\nErav\n", encoding="utf-16")
+
+    assert main(["log", str(log_path)]) == 0
 
 
 def test_init_project_creates_config(tmp_path: Path) -> None:

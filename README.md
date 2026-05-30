@@ -31,6 +31,13 @@ $env:ERAPLAY_REAL_PROJECT = "D:\path\to\era-game"
 python -m pytest tests\test_real_project_smoke.py
 ```
 
+An exported Emuera log can be summarized and used as a reference for load order,
+warnings, and the original startup screen:
+
+```powershell
+eraplay log "D:\新建文件夹\ERA\emuera\erAV-master\20260530-092446.log"
+```
+
 Check a project directory:
 
 ```powershell

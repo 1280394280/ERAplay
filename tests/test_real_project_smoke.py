@@ -5,10 +5,12 @@ import pytest
 
 from eraplay.compat import build_compatibility_report
 from eraplay.project import load_project
+from eraplay.reference_log import parse_emuera_log
 from eraplay.runtime import MiniRuntime
 from eraplay.ui import OutputChannel, OutputKind
 
 DEFAULT_REAL_PROJECT = Path(r"D:\新建文件夹\ERA\emuera\erAV-master")
+DEFAULT_EMUERA_LOG = DEFAULT_REAL_PROJECT / "20260530-092446.log"
 
 
 def _real_project_path() -> Path:
@@ -22,6 +24,17 @@ def _load_real_project():
     return load_project(path)
 
 
+def _real_log_path() -> Path:
+    return Path(os.environ.get("ERAPLAY_EMUERA_LOG", DEFAULT_EMUERA_LOG))
+
+
+def _load_real_log():
+    path = _real_log_path()
+    if not path.exists():
+        pytest.skip(f"Emuera startup log not found: {path}")
+    return parse_emuera_log(path)
+
+
 def test_real_project_loads_erav_data_summary() -> None:
     project = _load_real_project()
     report = build_compatibility_report(project)
@@ -33,6 +46,21 @@ def test_real_project_loads_erav_data_summary() -> None:
     assert project.data.variable_sizes["ITEM"] == 1000
     assert len(project.data.chara_files) == 120
     assert report.to_dict(top=5)["data"]["name_tables"]["TALENTNAME"] == 263
+
+
+def test_real_emuera_log_matches_reference_startup_summary() -> None:
+    summary = _load_real_log()
+
+    assert summary.macro_loaded is True
+    assert len(summary.erb_files) == 468
+    assert len(summary.erh_files) == 3
+    assert len(summary.csv_files) == 131
+    assert summary.chara_csv_count == 120
+    assert len(summary.warnings) == 28
+    assert summary.non_comment_lines == 157951
+    assert summary.function_count == 2227
+    assert summary.call_count == 1184
+    assert summary.startup_screen[-2:] == ("[0] 新的开始", "[1] 载入存档")
 
 
 def test_real_project_eventfirst_reaches_name_confirmation_after_normal_input() -> None:

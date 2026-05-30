@@ -11,6 +11,7 @@ from eraplay.compat import build_compatibility_report
 from eraplay.config import init_project_config
 from eraplay.index import SymbolKind, build_project_index
 from eraplay.project import load_project
+from eraplay.reference_log import parse_emuera_log
 from eraplay.runtime import MiniRuntime, run_project
 from eraplay.ui import OutputChannel, OutputKind
 from eraplay.webpreview import serve_preview
@@ -153,6 +154,37 @@ def init_project(
     return 0
 
 
+def summarize_emuera_log(
+    path: str | Path,
+    encoding: str | None = None,
+    out: TextIO | None = None,
+) -> int:
+    if out is None:
+        out = sys.stdout
+
+    summary = parse_emuera_log(path, encoding=encoding)
+    print(f"Emuera log: {summary.path}", file=out)
+    print(f"Encoding: {summary.encoding}", file=out)
+    print(
+        f"Loaded: {len(summary.erb_files)} ERB, {len(summary.erh_files)} ERH, "
+        f"{len(summary.csv_files)} CSV",
+        file=out,
+    )
+    print(f"Chara CSV: {summary.chara_csv_count}", file=out)
+    print(f"Warnings: {len(summary.warnings)}", file=out)
+    if summary.non_comment_lines is not None:
+        print(
+            f"Script summary: {summary.non_comment_lines} non-comment lines, "
+            f"{summary.function_count} functions, {summary.call_count} calls",
+            file=out,
+        )
+    if summary.startup_screen:
+        print("[startup screen]", file=out)
+        for line in summary.startup_screen:
+            print(line, file=out)
+    return 0
+
+
 def run_entry(
     path: str | Path,
     entry: str = "EVENTFIRST",
@@ -259,6 +291,14 @@ def _build_parser() -> argparse.ArgumentParser:
             output_format=args.format,
         )
     )
+
+    log = subparsers.add_parser("log", help="summarize an exported Emuera startup log")
+    log.add_argument("path", help="Emuera log file to inspect")
+    log.add_argument(
+        "--encoding",
+        help="preferred log encoding, usually utf-16 for Emuera logs",
+    )
+    log.set_defaults(handler=lambda args: summarize_emuera_log(args.path, args.encoding))
 
     init = subparsers.add_parser("init", help="create an eraplay.toml project config")
     init.add_argument("path", help="project directory to initialize")
