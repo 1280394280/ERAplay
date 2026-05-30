@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from eraplay.webpreview import (
+    PAGE_HTML,
     _body_value,
     _combined_log,
     _compat_state,
@@ -29,6 +30,12 @@ def test_webpreview_initial_state_has_actions() -> None:
     assert state["info"][0].startswith("state=waiting")
     assert {"id": "1", "text": "\u901a\u5e38\u696d\u52d9\n\u666e\u901a\u4e1a\u52a1"} in state["actions"]
     assert {"id": "2", "text": "\u8a3a\u5bdf\n\u8bca\u5bdf"} in state["actions"]
+
+
+def test_webpreview_page_uses_fixed_viewport_layout() -> None:
+    assert "height: 100dvh" in PAGE_HTML
+    assert "overflow: hidden" in PAGE_HTML
+    assert "grid-template-rows: minmax(0, 1fr) 120px 120px 160px" in PAGE_HTML
 
 
 def test_webpreview_input_moves_previous_screen_to_history() -> None:

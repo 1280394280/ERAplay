@@ -353,8 +353,9 @@ PAGE_HTML = """<!doctype html>
   <title>ERAplay Preview</title>
   <style>
     :root { color-scheme: dark; font-family: "Microsoft YaHei UI", "Yu Gothic UI", monospace; }
+    html, body { height: 100%; overflow: hidden; }
     body { margin: 0; background: #080808; color: #d8d8d8; }
-    .layout { min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
+    .layout { height: 100dvh; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; }
     header { padding: 10px 14px; border-bottom: 1px solid #333; color: #89dceb; }
     header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .header-tools { display: inline-flex; align-items: center; gap: 10px; }
@@ -362,15 +363,15 @@ PAGE_HTML = """<!doctype html>
     .modes button { padding: 5px 8px; }
     .modes button.active { background: #39616c; }
     #info { padding: 10px 14px; border-bottom: 1px solid #222; color: #c9f2ff; min-height: 22px; font-size: 13px; }
-    main { display: grid; grid-template-columns: 1fr 360px; min-height: 0; }
+    main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; min-height: 0; overflow: hidden; }
     #main { padding: 14px; white-space: pre-wrap; line-height: 1.55; overflow: auto; }
-    aside { border-left: 1px solid #333; display: grid; grid-template-rows: 1fr 120px 120px 160px; min-height: 0; }
+    aside { border-left: 1px solid #333; display: grid; grid-template-rows: minmax(0, 1fr) 120px 120px 160px; min-height: 0; overflow: hidden; }
     #history { padding: 14px; color: #888; overflow: auto; white-space: pre-wrap; }
     #compat { padding: 10px 14px; border-top: 1px solid #333; color: #d5e5a3; overflow: auto; white-space: pre-wrap; font-size: 12px; }
     #entries { padding: 10px 14px; border-top: 1px solid #333; color: #f2c078; overflow: auto; white-space: pre-wrap; font-size: 12px; }
     #entries button { display: block; width: 100%; margin-top: 6px; padding: 5px 7px; text-align: left; font-size: 12px; }
     #log { padding: 10px 14px; border-top: 1px solid #333; color: #8ab4f8; overflow: auto; white-space: pre-wrap; font-size: 12px; }
-    #actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px; border-top: 1px solid #333; min-height: 44px; }
+    #actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px; border-top: 1px solid #333; min-height: 44px; max-height: 132px; overflow: auto; }
     button { background: #1b2a2f; color: #e8f8ff; border: 1px solid #39616c; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
     button:hover { background: #24404a; }
   </style>
