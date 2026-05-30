@@ -123,6 +123,51 @@ ENDIF
     assert result.console.visible_text() == "off"
 
 
+def test_runtime_executes_elseif_branch(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+RESULT = 1
+IF RESULT == 0
+PRINTL "zero"
+ELSEIF RESULT == 1
+PRINTL "one"
+ELSE
+PRINTL "else"
+ENDIF
+PRINTL "done"
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+
+    result = run_project(project)
+
+    assert result.console.visible_text() == "one\ndone"
+
+
+def test_runtime_skips_elseif_after_true_if(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+RESULT = 0
+IF RESULT == 0
+PRINTL "zero"
+ELSEIF RESULT == 1
+PRINTL "one"
+ELSE
+PRINTL "else"
+ENDIF
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+
+    result = run_project(project)
+
+    assert result.console.visible_text() == "zero"
+
+
 def test_runtime_executes_nested_if(tmp_path: Path) -> None:
     (tmp_path / "main.erb").write_text(
         """

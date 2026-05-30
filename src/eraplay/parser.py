@@ -9,6 +9,7 @@ from eraplay.ast import (
     CaseElse,
     Command,
     ElseBlock,
+    ElseIfBlock,
     EndIf,
     EndSelect,
     Goto,
@@ -47,6 +48,9 @@ def parse_line(line: LogicalLine) -> Node:
 
     if upper == "ELSE":
         return ElseBlock(line.span)
+
+    if upper.startswith("ELSEIF "):
+        return ElseIfBlock(line.span, text[7:].strip())
 
     if upper == "ENDIF":
         return EndIf(line.span)

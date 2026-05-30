@@ -10,6 +10,7 @@ from eraplay.ast import (
     CaseElse,
     Command,
     ElseBlock,
+    ElseIfBlock,
     EndIf,
     EndSelect,
     Goto,
@@ -108,7 +109,9 @@ class MiniRuntime:
         if isinstance(node, IfBlock):
             if self._eval_condition(node.condition):
                 return index + 1
-            return self._find_else_or_endif(nodes, index) + 1
+            return self._find_next_if_branch(nodes, index)
+        if isinstance(node, ElseIfBlock):
+            return self._find_matching_endif(nodes, index) + 1
         if isinstance(node, ElseBlock):
             return self._find_matching_endif(nodes, index) + 1
         if isinstance(node, EndIf):
@@ -196,8 +199,7 @@ class MiniRuntime:
                 return _compare_values(left_value, right_value, operator)
         return bool(self._eval_value(expression))
 
-    @staticmethod
-    def _find_else_or_endif(nodes: tuple[Node, ...], index: int) -> int:
+    def _find_next_if_branch(self, nodes: tuple[Node, ...], index: int) -> int:
         depth = 0
         for cursor in range(index + 1, len(nodes)):
             node = nodes[cursor]
@@ -205,11 +207,14 @@ class MiniRuntime:
                 depth += 1
             elif isinstance(node, EndIf):
                 if depth == 0:
-                    return cursor
+                    return cursor + 1
                 depth -= 1
-            elif isinstance(node, ElseBlock) and depth == 0:
-                return cursor
-        return len(nodes) - 1
+            elif depth == 0 and isinstance(node, ElseIfBlock):
+                if self._eval_condition(node.condition):
+                    return cursor + 1
+            elif depth == 0 and isinstance(node, ElseBlock):
+                return cursor + 1
+        return len(nodes)
 
     @staticmethod
     def _find_matching_endif(nodes: tuple[Node, ...], index: int) -> int:

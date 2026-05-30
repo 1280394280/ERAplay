@@ -17,6 +17,7 @@ class NodeKind(str, Enum):
     ASSIGNMENT = "assignment"
     RETURN = "return"
     IF = "if"
+    ELSEIF = "elseif"
     ELSE = "else"
     ENDIF = "endif"
     SELECTCASE = "selectcase"
@@ -96,6 +97,16 @@ class IfBlock(Node):
 
     def __init__(self, span: SourceSpan, condition: str) -> None:
         object.__setattr__(self, "kind", NodeKind.IF)
+        object.__setattr__(self, "span", span)
+        object.__setattr__(self, "condition", condition)
+
+
+@dataclass(frozen=True)
+class ElseIfBlock(Node):
+    condition: str
+
+    def __init__(self, span: SourceSpan, condition: str) -> None:
+        object.__setattr__(self, "kind", NodeKind.ELSEIF)
         object.__setattr__(self, "span", span)
         object.__setattr__(self, "condition", condition)
 

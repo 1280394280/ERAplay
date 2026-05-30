@@ -7,6 +7,7 @@ from eraplay.ast import (
     CaseElse,
     Command,
     ElseBlock,
+    ElseIfBlock,
     EndIf,
     EndSelect,
     Goto,
@@ -141,3 +142,19 @@ ENDSELECT
     assert program.nodes[2].values == ("1", "2")
     assert isinstance(program.nodes[4], CaseElse)
     assert isinstance(program.nodes[6], EndSelect)
+
+
+def test_parse_elseif() -> None:
+    program = parse_source(
+        """
+@EVENTFIRST
+IF RESULT == 0
+PRINTL "zero"
+ELSEIF RESULT == 1
+PRINTL "one"
+ENDIF
+"""
+    )
+
+    assert isinstance(program.nodes[3], ElseIfBlock)
+    assert program.nodes[3].condition == "RESULT == 1"
