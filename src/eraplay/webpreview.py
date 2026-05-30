@@ -228,6 +228,8 @@ def _runtime_state(
             main.append(text)
     if not runtime.state.waiting_for_input:
         actions = []
+    elif runtime.state.waiting_reason == "continue":
+        actions = [{"id": "", "text": "继续"}]
     return {
         "info": info,
         "main": main,
@@ -238,6 +240,7 @@ def _runtime_state(
         "status": {
             "entry": entry,
             "waiting": runtime.state.waiting_for_input,
+            "waiting_reason": runtime.state.waiting_reason,
             "steps": runtime.state.steps,
             "result": runtime.state.result,
             "error": error,

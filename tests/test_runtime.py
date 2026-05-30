@@ -87,8 +87,30 @@ def test_runtime_records_ignored_command_trace(tmp_path: Path) -> None:
 
     runtime.run()
 
-    assert "ignored command=WAIT" in runtime.trace
+    assert runtime.state.waiting_reason == "continue"
+    assert "continue waiting source=wait" in runtime.trace
+    runtime.resume()
     assert "input waiting" in runtime.trace
+
+
+def test_runtime_printw_waits_for_continue(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        '@EVENTFIRST\nPRINTW "story"\nPRINTL "after"\n',
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+    runtime = MiniRuntime(project)
+
+    runtime.run()
+
+    assert runtime.state.waiting_for_input is True
+    assert runtime.state.waiting_reason == "continue"
+    assert runtime.console.visible_text() == "story"
+
+    runtime.resume()
+
+    assert runtime.state.waiting_for_input is False
+    assert runtime.console.visible_text() == "story\nafter"
 
 
 def test_runtime_assigns_simple_values(tmp_path: Path) -> None:

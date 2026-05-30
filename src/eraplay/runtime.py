@@ -68,11 +68,14 @@ class MiniRuntime:
         self.call(entry)
         return RuntimeResult(self.console, self.state)
 
-    def resume(self, value: int | str) -> RuntimeResult:
+    def resume(self, value: int | str | None = None) -> RuntimeResult:
         if not self.state.waiting_for_input:
             raise RuntimeError("runtime is not waiting for input")
-        self.state.result = value
-        self.state.variables["RESULT"] = value
+        reason = self.state.waiting_reason
+        if reason != "continue":
+            self.state.result = value
+            if value is not None:
+                self.state.variables["RESULT"] = value
         self.state.waiting_for_input = False
         self.state.waiting_reason = None
         if self._startup_waiting:
@@ -157,14 +160,19 @@ class MiniRuntime:
             self.console.print_line(self._format_text(text))
         elif command.name in {"PRINTFORM", "PRINTPLAINFORM"}:
             self.console.print(self._format_text(text))
-        elif command.name in {"PRINTFORML", "PRINTFORMW"}:
+        elif command.name == "PRINTFORML":
             self.console.print_line(self._format_text(text))
+        elif command.name in {"PRINTW", "PRINTFORMW"}:
+            self.console.print_line(self._format_text(text))
+            self._wait_for_continue(command.name.lower())
         elif command.name == "DRAWLINE":
             self.console.draw_line()
         elif command.name == "CLEAR":
             self.console.clear()
         elif command.name in {"#DIM", "#DIMS"}:
             self._execute_dim(command)
+        elif command.name == "WAIT":
+            self._wait_for_continue("wait")
         elif command.name == "INPUT":
             self._trace("input waiting")
             self.state.waiting_for_input = True
@@ -172,6 +180,11 @@ class MiniRuntime:
             return
         else:
             self._trace(f"ignored command={command.name}")
+
+    def _wait_for_continue(self, source: str) -> None:
+        self._trace(f"continue waiting source={source}")
+        self.state.waiting_for_input = True
+        self.state.waiting_reason = "continue"
 
     def _push_call(self, label: str) -> None:
         key = label.upper()

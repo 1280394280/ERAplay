@@ -87,6 +87,9 @@ def test_real_project_eventfirst_reaches_name_confirmation_after_normal_input() 
     runtime = MiniRuntime(project)
 
     runtime.run("EVENTFIRST")
+    assert runtime.state.waiting_reason == "continue"
+    runtime.resume()
+
     first_actions = _action_ids(runtime)
     assert first_actions == [0, 1, 9]
 
@@ -108,6 +111,8 @@ def test_real_project_name_decision_advances_to_next_prompt() -> None:
 
     runtime.run("__TITLE__")
     runtime.resume(0)
+    assert runtime.state.waiting_reason == "continue"
+    runtime.resume()
     runtime.resume(1)
     runtime.resume(0)
 

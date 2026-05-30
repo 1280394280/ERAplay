@@ -58,6 +58,20 @@ def test_webpreview_input_moves_previous_screen_to_history() -> None:
     assert "[2] \u8a3a\u5bdf\n[2] \u8bca\u5bdf" in state["history"]
 
 
+def test_webpreview_continue_wait_has_continue_action(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text('@EVENTFIRST\nPRINTW "story"\nPRINTL "after"\n', encoding="utf-8")
+    server = create_preview_server(tmp_path, entry="EVENTFIRST", port=0)
+    try:
+        runtime = server.session.current()
+        state = _runtime_state(runtime, runtime.project.config.translation, server.session.log)
+    finally:
+        server.server_close()
+
+    assert state["waiting"] is True
+    assert state["status"]["waiting_reason"] == "continue"
+    assert state["actions"] == [{"id": "", "text": "\u7ee7\u7eed"}]
+
+
 def test_webpreview_translation_mode_override() -> None:
     server = create_preview_server(ROOT / "fixtures", entry="DEMO_MENU", port=0)
     try:
