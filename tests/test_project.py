@@ -61,3 +61,16 @@ def test_load_project_can_override_exclude_dirs(tmp_path: Path) -> None:
     project = load_project(tmp_path)
 
     assert [loaded.file.path.name for loaded in project.erb_files] == ["main.erb"]
+
+
+def test_load_project_builds_era_data(tmp_path: Path) -> None:
+    (tmp_path / "CSV" / "Chara").mkdir(parents=True)
+    (tmp_path / "CSV" / "VariableSize.CSV").write_text("FLAG,10000\n", encoding="utf-8")
+    (tmp_path / "CSV" / "Abl.csv").write_text("0,Technique\n", encoding="utf-8")
+    (tmp_path / "CSV" / "Chara" / "Chara0.csv").write_text("名前,Demo\n", encoding="utf-8")
+
+    project = load_project(tmp_path)
+
+    assert project.data.variable_sizes["FLAG"] == 10000
+    assert project.data.name_tables["ABLNAME"] == {0: "Technique"}
+    assert len(project.data.chara_files) == 1

@@ -427,8 +427,11 @@ PAGE_HTML = """<!doctype html>
     async function refreshCompat() {
       const report = await fetch('/compat?top=5').then(r => r.json());
       const calls = report.unresolved_calls.map(item => `${item.count}: ${item.target}`).join('\\n');
+      const tables = Object.entries(report.data.name_tables).map(([name, count]) => `${name}:${count}`).join(' ');
       document.querySelector('#compat').textContent =
-        `compat=${report.status} diagnostics=${report.diagnostics}` + (calls ? `\\n${calls}` : '');
+        `compat=${report.status} diagnostics=${report.diagnostics}` +
+        `\\ndata vars=${report.data.variable_sizes} tables=${tables || 0} chara=${report.data.chara_files}` +
+        (calls ? `\\n${calls}` : '');
     }
     async function refreshEntries() {
       const report = await fetch('/entries?top=6').then(r => r.json());

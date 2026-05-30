@@ -6,6 +6,7 @@ from pathlib import Path
 from eraplay.ast import Program
 from eraplay.config import ProjectConfig, load_project_config
 from eraplay.csvdata import CsvDocument, parse_csv_source
+from eraplay.eradata import EraData, LoadedCsvLike, build_era_data
 from eraplay.erh import ErhDocument, parse_erh_source
 from eraplay.parser import parse_source
 from eraplay.text import DecodedText, read_text_file
@@ -42,6 +43,7 @@ class EraProject:
     erb_files: tuple[LoadedErb, ...]
     erh_files: tuple[LoadedErh, ...]
     csv_files: tuple[LoadedCsv, ...]
+    data: EraData
 
 
 def load_project(
@@ -63,7 +65,11 @@ def load_project(
         _load_csv(path, encoding)
         for path in _glob_case_insensitive(root_path, "*.csv", config.exclude_dirs)
     )
-    return EraProject(root_path, config, erb_files, erh_files, csv_files)
+    data = build_era_data(
+        root_path,
+        tuple(LoadedCsvLike(csv.file.path, csv.document) for csv in csv_files),
+    )
+    return EraProject(root_path, config, erb_files, erh_files, csv_files, data)
 
 
 def _load_text(path: Path, preferred_encoding: str | None) -> LoadedTextFile:

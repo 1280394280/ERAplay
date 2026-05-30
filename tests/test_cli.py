@@ -83,6 +83,7 @@ def test_compatibility_report_summarizes_ok_project() -> None:
 
     assert exit_code == 0
     assert "Compatibility report:" in text
+    assert "Data:" in text
     assert "Diagnostics: 0" in text
     assert "Status: OK" in text
 
@@ -116,6 +117,11 @@ def test_compatibility_report_can_emit_json(tmp_path: Path) -> None:
 
     assert exit_code == 0
     assert data["files"]["erb"] == 1
+    assert data["data"] == {
+        "variable_sizes": 0,
+        "name_tables": {},
+        "chara_files": 0,
+    }
     assert data["diagnostics"] == 3
     assert data["diagnostic_kinds"] == [{"kind": "unresolved CALL", "count": 3}]
     assert data["unresolved_calls"] == [{"target": "MISSING", "count": 2}]

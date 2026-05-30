@@ -39,6 +39,14 @@ class CompatibilityReport:
                 "erh": len(self.project.erh_files),
                 "csv": len(self.project.csv_files),
             },
+            "data": {
+                "variable_sizes": len(self.project.data.variable_sizes),
+                "name_tables": {
+                    name: len(table)
+                    for name, table in sorted(self.project.data.name_tables.items())
+                },
+                "chara_files": len(self.project.data.chara_files),
+            },
             "diagnostics": len(self.diagnostics),
             "diagnostic_kinds": [
                 {"kind": kind, "count": count}

@@ -178,6 +178,7 @@ def test_webpreview_compat_state_reports_fixture_ok() -> None:
     assert state["status"] == "ok"
     assert state["diagnostics"] == 0
     assert state["files"]["erb"] == 6
+    assert state["data"]["variable_sizes"] == 0
 
 
 def test_webpreview_entry_state_lists_candidate_entries() -> None:

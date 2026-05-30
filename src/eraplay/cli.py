@@ -106,6 +106,12 @@ def compatibility_report(
         f"{len(project.csv_files)} CSV",
         file=out,
     )
+    print(
+        f"Data: {len(project.data.variable_sizes)} variable sizes, "
+        f"{len(project.data.name_tables)} name tables, "
+        f"{len(project.data.chara_files)} chara CSV",
+        file=out,
+    )
     print(f"Diagnostics: {len(diagnostics)}", file=out)
     if project.config.exclude_dirs:
         print(f"Excluded dirs: {', '.join(project.config.exclude_dirs)}", file=out)

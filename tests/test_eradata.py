@@ -1,0 +1,37 @@
+from pathlib import Path
+
+from eraplay.csvdata import parse_csv_source
+from eraplay.eradata import LoadedCsvLike, build_era_data
+
+
+def test_build_era_data_reads_variable_sizes() -> None:
+    root = Path("game")
+    document = parse_csv_source("FLAG,10000\nITEM,1000\nBAD,not-number\n")
+
+    data = build_era_data(root, (LoadedCsvLike(root / "CSV" / "VariableSize.CSV", document),))
+
+    assert data.variable_sizes == {"FLAG": 10000, "ITEM": 1000}
+
+
+def test_build_era_data_reads_name_tables() -> None:
+    root = Path("game")
+    document = parse_csv_source("0,Technique\n1,Knowledge\n")
+
+    data = build_era_data(root, (LoadedCsvLike(root / "CSV" / "Abl.csv", document),))
+
+    assert data.name_tables["ABLNAME"] == {0: "Technique", 1: "Knowledge"}
+
+
+def test_build_era_data_counts_chara_files() -> None:
+    root = Path("game")
+    document = parse_csv_source("名前,Demo\n")
+
+    data = build_era_data(
+        root,
+        (
+            LoadedCsvLike(root / "CSV" / "Chara" / "Chara0.csv", document),
+            LoadedCsvLike(root / "CSV" / "GameBase.csv", document),
+        ),
+    )
+
+    assert data.chara_files == (root / "CSV" / "Chara" / "Chara0.csv",)
