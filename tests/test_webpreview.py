@@ -159,6 +159,31 @@ def test_webpreview_can_switch_entry_after_missing_entry(tmp_path: Path) -> None
     assert state["log"][-1] == "entry switched entry=EVENTFIRST"
 
 
+def test_webpreview_can_switch_to_title_entry(tmp_path: Path) -> None:
+    (tmp_path / "CSV").mkdir()
+    (tmp_path / "CSV" / "GameBase.csv").write_text("タイトル,Demo\nバージョン,1070\n", encoding="utf-8")
+    (tmp_path / "main.erb").write_text("@EVENTFIRST\nPRINTL \"ok\"\n", encoding="utf-8")
+    server = create_preview_server(tmp_path, entry="EVENTFIRST", port=0)
+    try:
+        server.session.switch_entry("__TITLE__")
+        runtime = server.session.current()
+        state = _runtime_state(
+            runtime,
+            runtime.project.config.translation,
+            server.session.log,
+            server.session.error,
+            server.session.entry,
+        )
+    finally:
+        server.server_close()
+
+    assert state["status"]["entry"] == "__TITLE__"
+    assert state["waiting"] is True
+    assert "Demo" in state["main"]
+    assert {"id": "0", "text": "新的开始"} in state["actions"]
+    assert state["log"][-1] == "entry switched entry=__TITLE__"
+
+
 def test_webpreview_input_body_accepts_json() -> None:
     assert _input_value_from_body('{"value": "2"}', "application/json") == "2"
 

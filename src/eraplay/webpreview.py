@@ -380,11 +380,12 @@ PAGE_HTML = """<!doctype html>
     <header>
       <span>ERAplay Preview</span>
       <span class="header-tools">
-        <button id="restart">Restart</button>
+        <button id="restart">重开当前</button>
+        <button id="title">启动页</button>
         <span class="modes">
-          <button data-mode="original">Original</button>
-          <button data-mode="translated">Translated</button>
-          <button data-mode="bilingual">Bilingual</button>
+          <button data-mode="original">原文</button>
+          <button data-mode="translated">译文</button>
+          <button data-mode="bilingual">双语</button>
         </span>
       </span>
     </header>
@@ -463,6 +464,15 @@ PAGE_HTML = """<!doctype html>
     document.querySelector('#restart').onclick = async () => {
       await fetch(`/restart?mode=${encodeURIComponent(mode)}`, {method: 'POST'});
       await refresh();
+    };
+    document.querySelector('#title').onclick = async () => {
+      await fetch(`/entry?mode=${encodeURIComponent(mode)}`, {
+        method: 'POST',
+        headers: {'content-type': 'application/x-www-form-urlencoded'},
+        body: new URLSearchParams({entry: '__TITLE__'})
+      });
+      await refresh();
+      await refreshEntries();
     };
     refresh();
     refreshCompat();
