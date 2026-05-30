@@ -24,6 +24,7 @@ class EraData:
     variable_sizes: dict[str, int] = field(default_factory=dict)
     name_tables: dict[str, dict[int, str]] = field(default_factory=dict)
     chara_files: tuple[Path, ...] = ()
+    game_base: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -36,11 +37,14 @@ def build_era_data(root: Path, csv_files: tuple[LoadedCsvLike, ...]) -> EraData:
     variable_sizes: dict[str, int] = {}
     name_tables: dict[str, dict[int, str]] = {}
     chara_files: list[Path] = []
+    game_base: dict[str, tuple[str, ...]] = {}
 
     for loaded in csv_files:
         name = loaded.path.name.casefold()
         if name == "variablesize.csv":
             variable_sizes.update(_parse_variable_sizes(loaded.document))
+        if name == "gamebase.csv":
+            game_base = _parse_game_base(loaded.document)
         if name in NAME_TABLE_CSV:
             name_tables[NAME_TABLE_CSV[name]] = _parse_name_table(loaded.document)
         if _is_chara_csv(root, loaded.path):
@@ -50,6 +54,7 @@ def build_era_data(root: Path, csv_files: tuple[LoadedCsvLike, ...]) -> EraData:
         variable_sizes=variable_sizes,
         name_tables=name_tables,
         chara_files=tuple(sorted(chara_files)),
+        game_base=game_base,
     )
 
 
@@ -75,6 +80,16 @@ def _parse_name_table(document: CsvDocument) -> dict[int, str]:
         if row.values:
             table[index] = row.values[0]
     return table
+
+
+def _parse_game_base(document: CsvDocument) -> dict[str, tuple[str, ...]]:
+    data: dict[str, tuple[str, ...]] = {}
+    for row in document.rows:
+        values = list(row.values)
+        while values and values[-1] == "":
+            values.pop()
+        data[row.key.upper()] = tuple(values)
+    return data
 
 
 def _is_chara_csv(root: Path, path: Path) -> bool:

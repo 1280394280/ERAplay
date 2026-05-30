@@ -39,9 +39,13 @@ def test_load_project_excludes_default_non_source_dirs(tmp_path: Path) -> None:
     (tmp_path / "ERB").mkdir()
     (tmp_path / "\u8cc7\u6599").mkdir()
     (tmp_path / "\u9644\u4ef6").mkdir()
+    (tmp_path / "HO\u7248\u8cc7\u6599\uff08\u4f5c\u6210\u4e2d\u9014\uff09").mkdir()
     (tmp_path / "ERB" / "main.erb").write_text("@EVENTFIRST\n", encoding="utf-8")
     (tmp_path / "\u8cc7\u6599" / "template.erb").write_text("@EVENTFIRST\n", encoding="utf-8")
     (tmp_path / "\u9644\u4ef6" / "patch.erb").write_text("@EVENTFIRST\n", encoding="utf-8")
+    (
+        tmp_path / "HO\u7248\u8cc7\u6599\uff08\u4f5c\u6210\u4e2d\u9014\uff09" / "draft.erb"
+    ).write_text("@EVENTFIRST\n", encoding="utf-8")
 
     project = load_project(tmp_path)
 
@@ -67,10 +71,16 @@ def test_load_project_builds_era_data(tmp_path: Path) -> None:
     (tmp_path / "CSV" / "Chara").mkdir(parents=True)
     (tmp_path / "CSV" / "VariableSize.CSV").write_text("FLAG,10000\n", encoding="utf-8")
     (tmp_path / "CSV" / "Abl.csv").write_text("0,Technique\n", encoding="utf-8")
+    (tmp_path / "CSV" / "GameBase.csv").write_text(
+        "タイトル,Demo\nバージョン,1070\n",
+        encoding="utf-8",
+    )
     (tmp_path / "CSV" / "Chara" / "Chara0.csv").write_text("名前,Demo\n", encoding="utf-8")
 
     project = load_project(tmp_path)
 
     assert project.data.variable_sizes["FLAG"] == 10000
     assert project.data.name_tables["ABLNAME"] == {0: "Technique"}
+    assert project.data.game_base["タイトル"] == ("Demo",)
+    assert project.data.game_base["バージョン"] == ("1070",)
     assert len(project.data.chara_files) == 1

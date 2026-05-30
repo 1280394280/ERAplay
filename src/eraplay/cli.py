@@ -110,7 +110,8 @@ def compatibility_report(
     print(
         f"Data: {len(project.data.variable_sizes)} variable sizes, "
         f"{len(project.data.name_tables)} name tables, "
-        f"{len(project.data.chara_files)} chara CSV",
+        f"{len(project.data.chara_files)} chara CSV, "
+        f"gamebase={'yes' if project.data.game_base else 'no'}",
         file=out,
     )
     print(f"Diagnostics: {len(diagnostics)}", file=out)

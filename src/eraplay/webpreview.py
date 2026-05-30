@@ -430,7 +430,7 @@ PAGE_HTML = """<!doctype html>
       const tables = Object.entries(report.data.name_tables).map(([name, count]) => `${name}:${count}`).join(' ');
       document.querySelector('#compat').textContent =
         `compat=${report.status} diagnostics=${report.diagnostics}` +
-        `\\ndata vars=${report.data.variable_sizes} tables=${tables || 0} chara=${report.data.chara_files}` +
+        `\\ndata vars=${report.data.variable_sizes} tables=${tables || 0} chara=${report.data.chara_files} gamebase=${report.data.game_base.loaded ? 'yes' : 'no'}` +
         (calls ? `\\n${calls}` : '');
     }
     async function refreshEntries() {

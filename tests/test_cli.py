@@ -122,6 +122,11 @@ def test_compatibility_report_can_emit_json(tmp_path: Path) -> None:
         "variable_sizes": 0,
         "name_tables": {},
         "chara_files": 0,
+        "game_base": {
+            "loaded": False,
+            "title": None,
+            "version": None,
+        },
     }
     assert data["diagnostics"] == 3
     assert data["diagnostic_kinds"] == [{"kind": "unresolved CALL", "count": 3}]

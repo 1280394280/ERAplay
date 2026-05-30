@@ -41,20 +41,25 @@ def test_real_project_loads_erav_data_summary() -> None:
 
     assert len(project.erb_files) == 468
     assert len(project.erh_files) == 3
-    assert len(project.csv_files) == 133
+    assert len(project.csv_files) == 132
     assert project.data.variable_sizes["FLAG"] == 10000
     assert project.data.variable_sizes["ITEM"] == 1000
+    assert project.data.game_base["タイトル"] == ("Erav",)
+    assert project.data.game_base["バージョン"] == ("1070",)
     assert len(project.data.chara_files) == 120
     assert report.to_dict(top=5)["data"]["name_tables"]["TALENTNAME"] == 263
 
 
 def test_real_emuera_log_matches_reference_startup_summary() -> None:
     summary = _load_real_log()
+    project = _load_real_project()
 
     assert summary.macro_loaded is True
     assert len(summary.erb_files) == 468
     assert len(summary.erh_files) == 3
     assert len(summary.csv_files) == 131
+    assert len(project.csv_files) == len(summary.csv_files) + 1
+    assert project.data.game_base["タイトル"] == ("Erav",)
     assert summary.chara_csv_count == 120
     assert len(summary.warnings) == 28
     assert summary.non_comment_lines == 157951

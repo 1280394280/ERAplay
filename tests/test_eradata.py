@@ -35,3 +35,16 @@ def test_build_era_data_counts_chara_files() -> None:
     )
 
     assert data.chara_files == (root / "CSV" / "Chara" / "Chara0.csv",)
+
+
+def test_build_era_data_reads_game_base_metadata() -> None:
+    root = Path("game")
+    document = parse_csv_source("タイトル,Demo,\nバージョン,1070\n作者,A,B\n")
+
+    data = build_era_data(root, (LoadedCsvLike(root / "CSV" / "GameBase.csv", document),))
+
+    assert data.game_base == {
+        "タイトル": ("Demo",),
+        "バージョン": ("1070",),
+        "作者": ("A", "B"),
+    }

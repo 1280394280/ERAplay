@@ -16,6 +16,7 @@ DEFAULT_EXCLUDE_DIRS = (
     "resources",
     "\u8cc7\u6599",
     "\u9644\u4ef6",
+    "HO\u7248\u8cc7\u6599\uff08\u4f5c\u6210\u4e2d\u9014\uff09",
 )
 DEFAULT_EXTERNAL_CALLS: tuple[str, ...] = ()
 
@@ -54,7 +55,7 @@ def load_project_config(root: str | Path) -> ProjectConfig:
 def default_config_text(source_encoding: str = "utf-8") -> str:
     return f"""[project]
 source_encoding = "{source_encoding}"
-exclude_dirs = [".git", "__pycache__", "sav", "save", "debug", "resources", "資料", "附件"]
+exclude_dirs = [".git", "__pycache__", "sav", "save", "debug", "resources", "資料", "附件", "HO版資料（作成中途）"]
 external_calls = []
 
 [translation]

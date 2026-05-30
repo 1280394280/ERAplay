@@ -46,6 +46,11 @@ class CompatibilityReport:
                     for name, table in sorted(self.project.data.name_tables.items())
                 },
                 "chara_files": len(self.project.data.chara_files),
+                "game_base": {
+                    "loaded": bool(self.project.data.game_base),
+                    "title": _first_game_base_value(self.project.data.game_base, "タイトル"),
+                    "version": _first_game_base_value(self.project.data.game_base, "バージョン"),
+                },
             },
             "diagnostics": len(self.diagnostics),
             "diagnostic_kinds": [
@@ -85,3 +90,10 @@ def _diagnostic_kind(message: str) -> str:
     if message.startswith("empty CSV key"):
         return "empty CSV key"
     return "other"
+
+
+def _first_game_base_value(data: dict[str, tuple[str, ...]], key: str) -> str | None:
+    values = data.get(key)
+    if not values:
+        return None
+    return values[0]

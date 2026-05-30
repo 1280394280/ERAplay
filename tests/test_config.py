@@ -40,6 +40,7 @@ def test_load_missing_project_config_returns_defaults(tmp_path: Path) -> None:
     assert config.source_encoding is None
     assert "\u8cc7\u6599" in config.exclude_dirs
     assert "\u9644\u4ef6" in config.exclude_dirs
+    assert "HO\u7248\u8cc7\u6599\uff08\u4f5c\u6210\u4e2d\u9014\uff09" in config.exclude_dirs
     assert config.translation.enabled is False
 
 
@@ -59,6 +60,7 @@ def test_default_config_text_contains_encoding() -> None:
 
     assert 'source_encoding = "cp950"' in text
     assert "exclude_dirs" in text
+    assert "HO\u7248\u8cc7\u6599\uff08\u4f5c\u6210\u4e2d\u9014\uff09" in text
     assert "external_calls" in text
     assert "[translation]" in text
 
