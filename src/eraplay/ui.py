@@ -27,6 +27,7 @@ class OutputEvent:
     kind: OutputKind
     text: str = ""
     choice_id: str | None = None
+    enabled: bool = True
     span: SourceSpan | None = None
 
 
@@ -41,6 +42,7 @@ def make_line(
 def make_action(
     choice_id: str,
     text: str,
+    enabled: bool = True,
     span: SourceSpan | None = None,
 ) -> OutputEvent:
     return OutputEvent(
@@ -48,5 +50,6 @@ def make_action(
         kind=OutputKind.ACTION,
         text=text,
         choice_id=choice_id,
+        enabled=enabled,
         span=span,
     )

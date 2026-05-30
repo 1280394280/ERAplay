@@ -216,12 +216,15 @@ def _runtime_state(
     if error is not None:
         info.append(f"error={error}")
     main: list[str] = []
-    actions: list[dict[str, str]] = []
+    actions: list[dict[str, object]] = []
     history: list[str] = []
     for event in runtime.console.to_events():
         text = translate_event_text(event, translation) if translation is not None else event.text
         if event.channel is OutputChannel.ACTIONS and event.kind is OutputKind.ACTION:
-            actions.append({"id": event.choice_id or "", "text": text})
+            action: dict[str, object] = {"id": event.choice_id or "", "text": text}
+            if not event.enabled:
+                action["enabled"] = False
+            actions.append(action)
         elif event.channel is OutputChannel.HISTORY:
             history.append(text)
         else:
@@ -377,6 +380,8 @@ PAGE_HTML = """<!doctype html>
     #actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px; border-top: 1px solid #333; min-height: 44px; max-height: 132px; overflow: auto; }
     button { background: #1b2a2f; color: #e8f8ff; border: 1px solid #39616c; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
     button:hover { background: #24404a; }
+    button:disabled { color: #87959a; border-color: #333; background: #12191c; cursor: default; opacity: 0.75; }
+    button:disabled:hover { background: #12191c; }
   </style>
 </head>
 <body>
@@ -420,7 +425,9 @@ PAGE_HTML = """<!doctype html>
       actions.replaceChildren(...state.actions.map(action => {
         const button = document.createElement('button');
         button.textContent = `${action.id}: ${action.text}`;
+        button.disabled = action.enabled === false;
         button.onclick = async () => {
+          if (button.disabled) return;
           await fetch('/input', {
             method: 'POST',
             headers: {'content-type': 'application/x-www-form-urlencoded'},

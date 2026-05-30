@@ -80,16 +80,23 @@ def _trim_trailing_empty(lines: list[str]) -> list[str]:
 
 def _parse_action_line(line: str) -> list[OutputEvent]:
     brackets = list(re.finditer(r"\[([^\]]+)]", line))
+    choice_brackets = [match for match in brackets if _is_choice_marker(match.group(1).strip())]
     actions: list[OutputEvent] = []
-    for index, match in enumerate(brackets):
+    for index, match in enumerate(choice_brackets):
         choice_id = match.group(1).strip()
-        if not choice_id.isdigit():
-            continue
         start = match.end()
-        end = brackets[index + 1].start() if index + 1 < len(brackets) else len(line)
+        end = choice_brackets[index + 1].start() if index + 1 < len(choice_brackets) else len(line)
         text = line[start:end].strip()
         if text.startswith("-"):
             text = text[1:].strip()
         if text:
-            actions.append(make_action(choice_id, text))
+            actions.append(make_action(choice_id, text, enabled=choice_id.isdigit()))
     return actions
+
+
+def _is_choice_marker(text: str) -> bool:
+    return text.isdigit() or _is_disabled_choice_marker(text)
+
+
+def _is_disabled_choice_marker(text: str) -> bool:
+    return bool(text) and all(char in {"-", "－"} for char in text)

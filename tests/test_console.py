@@ -69,9 +69,10 @@ def test_classic_console_classifies_multiple_actions_on_one_line() -> None:
 
     events = console.to_events()
 
-    assert [(event.choice_id, event.text) for event in events] == [
-        ("101", "物色人才"),
-        ("102", "成人商店"),
+    assert [(event.choice_id, event.text, event.enabled) for event in events] == [
+        ("---", "－－－－－－－", False),
+        ("101", "物色人才", True),
+        ("102", "成人商店", True),
     ]
 
 
@@ -82,4 +83,44 @@ def test_classic_console_stops_action_text_at_any_next_bracket() -> None:
 
     events = console.to_events()
 
-    assert [(event.choice_id, event.text) for event in events] == [("109", "Visit")]
+    assert [(event.choice_id, event.text, event.enabled) for event in events] == [
+        ("109", "Visit", True),
+        ("---", "-----", False),
+    ]
+
+
+def test_classic_console_classifies_disabled_choice_placeholders() -> None:
+    console = ClassicConsoleBuffer()
+
+    console.print_line("[---] - Locked [999]Return")
+
+    events = console.to_events()
+
+    assert [(event.choice_id, event.text, event.enabled) for event in events] == [
+        ("---", "Locked", False),
+        ("999", "Return", True),
+    ]
+
+
+def test_classic_console_keeps_non_choice_brackets_in_main_text() -> None:
+    console = ClassicConsoleBuffer()
+
+    console.print_line("[春] 4月 第1周")
+
+    events = console.to_events()
+
+    assert events[0].channel is OutputChannel.MAIN
+    assert events[0].text == "[春] 4月 第1周"
+
+
+def test_classic_console_keeps_status_brackets_inside_action_text() -> None:
+    console = ClassicConsoleBuffer()
+
+    console.print_line("[1] Hero | < > [Type] [999]Return")
+
+    events = console.to_events()
+
+    assert [(event.choice_id, event.text) for event in events] == [
+        ("1", "Hero | < > [Type]"),
+        ("999", "Return"),
+    ]

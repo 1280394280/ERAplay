@@ -94,6 +94,26 @@ PRINTL "[105] 什么都不做"
     assert {"id": "105", "text": "什么都不做"} in state["actions"]
 
 
+def test_webpreview_state_marks_disabled_action_placeholders(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+PRINTL "[---] - Locked [999]Return"
+INPUT
+""",
+        encoding="utf-8",
+    )
+    server = create_preview_server(tmp_path, entry="EVENTFIRST", port=0)
+    try:
+        runtime = server.session.current()
+        state = _runtime_state(runtime, runtime.project.config.translation, server.session.log)
+    finally:
+        server.server_close()
+
+    assert {"id": "---", "text": "Locked", "enabled": False} in state["actions"]
+    assert {"id": "999", "text": "Return"} in state["actions"]
+
+
 def test_webpreview_translation_mode_override() -> None:
     server = create_preview_server(ROOT / "fixtures", entry="DEMO_MENU", port=0)
     try:
