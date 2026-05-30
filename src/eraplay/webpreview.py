@@ -218,12 +218,16 @@ def _runtime_state(
     main: list[str] = []
     actions: list[dict[str, object]] = []
     history: list[str] = []
+    command_targets = runtime.command_resolver.resolve()
     for event in runtime.console.to_events():
         text = translate_event_text(event, translation) if translation is not None else event.text
         if event.channel is OutputChannel.ACTIONS and event.kind is OutputKind.ACTION:
             action: dict[str, object] = {"id": event.choice_id or "", "text": text}
             if not event.enabled:
                 action["enabled"] = False
+            target = command_targets.get(event.choice_id or "")
+            if target is not None:
+                action["target"] = target.detail
             actions.append(action)
         elif event.channel is OutputChannel.HISTORY:
             history.append(text)
@@ -425,6 +429,7 @@ PAGE_HTML = """<!doctype html>
       actions.replaceChildren(...state.actions.map(action => {
         const button = document.createElement('button');
         button.textContent = `${action.id}: ${action.text}`;
+        if (action.target) button.title = action.target;
         button.disabled = action.enabled === false;
         button.onclick = async () => {
           if (button.disabled) return;

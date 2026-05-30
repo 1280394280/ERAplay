@@ -20,6 +20,8 @@ from eraplay.ast import (
     Return,
     SelectCase,
 )
+from eraplay.builtins import BuiltinHandlers
+from eraplay.command_resolver import CommandResolver
 from eraplay.console import ClassicConsoleBuffer
 from eraplay.project import EraProject
 
@@ -30,6 +32,7 @@ class RuntimeState:
     result: int | str | None = None
     waiting_for_input: bool = False
     waiting_reason: str | None = None
+    input_context: "InputContext | None" = None
     steps: int = 0
 
 
@@ -44,6 +47,12 @@ class RuntimeFrame:
     nodes: tuple[Node, ...]
     index: int
     wait_after: str | None = None
+
+
+@dataclass(frozen=True)
+class InputContext:
+    kind: str
+    reason: str
 
 
 class RuntimeError(Exception):
@@ -61,9 +70,8 @@ class MiniRuntime:
         self.max_steps = max_steps
         self.max_trace = max_trace
         self.trace: list[str] = []
-        self._startup_waiting = False
-        self._shop_waiting = False
-        self._item_shop_waiting = False
+        self.builtins = BuiltinHandlers(self)
+        self.command_resolver = CommandResolver(self)
 
     def run(self, entry: str = "EVENTFIRST") -> RuntimeResult:
         if _is_startup_entry(entry):
@@ -82,16 +90,15 @@ class MiniRuntime:
                 self.state.variables["RESULT"] = value
         self.state.waiting_for_input = False
         self.state.waiting_reason = None
-        if self._startup_waiting:
-            self._startup_waiting = False
+        context = self.state.input_context
+        self.state.input_context = None
+        if context is not None and context.kind == "startup":
             self._resume_startup(value)
             return RuntimeResult(self.console, self.state)
-        if self._shop_waiting:
-            self._shop_waiting = False
+        if context is not None and context.kind == "shop":
             self._resume_shop(value)
             return RuntimeResult(self.console, self.state)
-        if self._item_shop_waiting:
-            self._item_shop_waiting = False
+        if context is not None and context.kind == "item_shop":
             self._resume_item_shop(value)
             return RuntimeResult(self.console, self.state)
         self._run_until_wait()
@@ -151,7 +158,7 @@ class MiniRuntime:
             return index + 1
         if isinstance(node, Call):
             self._trace(f"call target={node.target}")
-            if self._execute_builtin_call(node.target):
+            if self.builtins.execute_call(node.target):
                 return index + 1
             self._push_call(node.target)
             return index + 1
@@ -194,10 +201,6 @@ class MiniRuntime:
             self._wait_for_continue(command.name.lower())
         elif command.name == "DRAWLINE":
             self.console.draw_line()
-        elif command.name == "PRINT_ITEM":
-            self._print_owned_items()
-        elif command.name == "PRINT_SHOPITEM":
-            self._print_shop_item_list()
         elif command.name == "CLEAR":
             self.console.clear()
         elif command.name in {"#DIM", "#DIMS"}:
@@ -208,16 +211,21 @@ class MiniRuntime:
             self._begin(command)
         elif command.name == "INPUT":
             self._trace("input waiting")
-            self.state.waiting_for_input = True
-            self.state.waiting_reason = "input"
+            self._set_waiting("input", "input")
+            return
+        elif self.builtins.execute_command(command):
             return
         else:
             self._trace(f"ignored command={command.name}")
 
+    def _set_waiting(self, kind: str, reason: str | None = None) -> None:
+        self.state.waiting_for_input = True
+        self.state.waiting_reason = reason or kind
+        self.state.input_context = InputContext(kind=kind, reason=reason or kind)
+
     def _wait_for_continue(self, source: str) -> None:
         self._trace(f"continue waiting source={source}")
-        self.state.waiting_for_input = True
-        self.state.waiting_reason = "continue"
+        self._set_waiting("continue", "continue")
 
     def _begin(self, command: Command) -> None:
         target = command.args[0].upper() if command.args else ""
@@ -244,14 +252,10 @@ class MiniRuntime:
     def _wait_after_frame(self, frame: RuntimeFrame) -> None:
         if frame.wait_after == "shop":
             self._trace("shop input waiting")
-            self.state.waiting_for_input = True
-            self.state.waiting_reason = "shop"
-            self._shop_waiting = True
+            self._set_waiting("shop", "shop")
         elif frame.wait_after == "item_shop":
             self._trace("item shop input waiting")
-            self.state.waiting_for_input = True
-            self.state.waiting_reason = "input"
-            self._item_shop_waiting = True
+            self._set_waiting("item_shop", "input")
 
     def _replace_current_frame(self, label: str) -> None:
         local_index = self._find_local_label(self.stack[-1].nodes, label)
@@ -353,9 +357,7 @@ class MiniRuntime:
         self.console.draw_line(width=213)
         self.console.print_line("[0] 新的开始")
         self.console.print_line("[1] 载入存档")
-        self.state.waiting_for_input = True
-        self.state.waiting_reason = "startup"
-        self._startup_waiting = True
+        self._set_waiting("startup", "startup")
 
     def _resume_startup(self, value: int | str) -> None:
         if value == 0 or value == "0":
@@ -364,14 +366,10 @@ class MiniRuntime:
             return
         if value == 1 or value == "1":
             self.console.print_line("载入存档尚未实现。")
-            self.state.waiting_for_input = True
-            self.state.waiting_reason = "startup"
-            self._startup_waiting = True
+            self._set_waiting("startup", "startup")
             self._trace("loadgame unsupported")
             return
-        self.state.waiting_for_input = True
-        self.state.waiting_reason = "startup"
-        self._startup_waiting = True
+        self._set_waiting("startup", "startup")
 
     def _resume_shop(self, value: int | str | None) -> None:
         if "SHOW_SHOP" in self.labels:
@@ -393,82 +391,7 @@ class MiniRuntime:
             self._run_until_wait()
             return
         self._trace(f"item purchase unsupported value={value}")
-        self.state.waiting_for_input = True
-        self.state.waiting_reason = "input"
-        self._item_shop_waiting = True
-
-    def _execute_builtin_call(self, target: str) -> bool:
-        if target.upper() == "SALEITEM_CHECK":
-            self._set_default_sale_items()
-            return True
-        if target.upper() == "PRINT_SHOPCHARALIST":
-            self._print_shop_chara_list()
-            return True
-        return False
-
-    def _set_default_sale_items(self) -> None:
-        owned = {
-            int(key.split(":", 1)[1])
-            for key, value in self.state.variables.items()
-            if key.startswith("ITEM:") and value
-        }
-        sale_ids = [
-            *(index for index in range(24) if index != 22),
-            24,
-            25,
-            29,
-            34,
-            37,
-            38,
-            39,
-            42,
-        ]
-        for item_id in range(100):
-            self.state.variables[f"ITEMSALES:{item_id}"] = 0
-        for item_id in sale_ids:
-            if item_id not in owned:
-                self.state.variables[f"ITEMSALES:{item_id}"] = 1
-
-    def _print_owned_items(self) -> None:
-        item_names = self.project.data.name_tables.get("ITEMNAME", {})
-        owned = [
-            f"{item_names[item_id]}({count})"
-            for item_id in sorted(item_names)
-            if item_id < 100
-            for count in [self._eval_value(f"ITEM:{item_id}")]
-            if isinstance(count, int) and count > 0
-        ]
-        if owned:
-            self.console.print_line(f"拥有的物品： {' '.join(owned)}")
-
-    def _print_shop_item_list(self) -> None:
-        item_names = self.project.data.name_tables.get("ITEMNAME", {})
-        prices = self.project.data.item_prices
-        entries = [
-            (item_id, item_names[item_id], prices.get(item_id, 0))
-            for item_id in sorted(item_names)
-            if item_id < 100 and self._eval_value(f"ITEMSALES:{item_id}")
-        ]
-        for offset in range(0, len(entries), 3):
-            row = entries[offset : offset + 3]
-            parts = [f"[{item_id}] {name}(${price})" for item_id, name, price in row]
-            self.console.print_line(" ".join(parts))
-
-    def _print_shop_chara_list(self) -> None:
-        item_names = self.project.data.name_tables.get("ITEMNAME", {})
-        prices = self.project.data.item_prices
-        page = self._eval_int("TFLAG:100")
-        start = page * 60 + 100
-        end = min(start + 60, 200)
-        entries = [
-            (index, item_names[index], prices.get(index, 0))
-            for index in range(start, end)
-            if index in item_names
-        ]
-        for offset in range(0, len(entries), 3):
-            row = entries[offset : offset + 3]
-            parts = [f"[{index}] {name} ({price} P)" for index, name, price in row]
-            self.console.print_line("    ".join(parts))
+        self._set_waiting("item_shop", "input")
 
     def _eval_condition(self, expression: str) -> bool:
         expression = expression.strip()
