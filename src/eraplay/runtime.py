@@ -195,6 +195,8 @@ class MiniRuntime:
         if expression is None:
             return 0
         expression = expression.strip()
+        if _is_parenthesized(expression):
+            return self._eval_value(expression[1:-1])
         if _is_percent_wrapped(expression):
             return self._eval_value(expression[1:-1])
         if _is_quoted(expression):
@@ -282,9 +284,17 @@ class MiniRuntime:
         self._startup_waiting = True
 
     def _eval_condition(self, expression: str) -> bool:
+        expression = expression.strip()
+        if _is_parenthesized(expression):
+            return self._eval_condition(expression[1:-1])
+        for operator, combiner in (("||", any), ("&&", all)):
+            parts = _split_top_level(expression, operator)
+            if len(parts) > 1:
+                return combiner(self._eval_condition(part) for part in parts)
         for operator in (">=", "<=", "==", "!=", ">", "<"):
-            if operator in expression:
-                left, right = expression.split(operator, 1)
+            parts = _split_top_level(expression, operator)
+            if len(parts) > 1:
+                left, right = parts[0], operator.join(parts[1:])
                 left_value = self._eval_value(left)
                 right_value = self._eval_value(right)
                 return _compare_values(left_value, right_value, operator)
@@ -417,6 +427,12 @@ def _is_quoted(text: str) -> bool:
     return len(text) >= 2 and text[0] == '"' and text[-1] == '"'
 
 
+def _is_parenthesized(text: str) -> bool:
+    if len(text) < 2 or text[0] != "(" or text[-1] != ")":
+        return False
+    return _find_matching_paren(text, 0) == len(text) - 1
+
+
 def _unquote_print_text(text: str) -> str:
     stripped = text.strip()
     if _is_quoted(stripped):
@@ -461,6 +477,72 @@ def _split_csv_like(text: str) -> list[str]:
             start = index + 1
     parts.append(text[start:])
     return parts
+
+
+def _split_top_level(text: str, separator: str) -> list[str]:
+    parts: list[str] = []
+    start = 0
+    depth = 0
+    in_string = False
+    escaped = False
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if escaped:
+            escaped = False
+            index += 1
+            continue
+        if char == "\\":
+            escaped = True
+            index += 1
+            continue
+        if char == '"':
+            in_string = not in_string
+            index += 1
+            continue
+        if in_string:
+            index += 1
+            continue
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth = max(depth - 1, 0)
+        elif depth == 0 and text.startswith(separator, index):
+            parts.append(text[start:index].strip())
+            index += len(separator)
+            start = index
+            continue
+        index += 1
+    if not parts:
+        return [text]
+    parts.append(text[start:].strip())
+    return parts
+
+
+def _find_matching_paren(text: str, open_index: int) -> int | None:
+    depth = 0
+    in_string = False
+    escaped = False
+    for index in range(open_index, len(text)):
+        char = text[index]
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\":
+            escaped = True
+            continue
+        if char == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
 
 
 def _compare_values(left: int | str, right: int | str, operator: str) -> bool:

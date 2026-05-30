@@ -102,6 +102,22 @@ def test_real_project_eventfirst_reaches_name_confirmation_after_normal_input() 
     assert "ignored command=CALLNAME:0" not in runtime.trace
 
 
+def test_real_project_name_decision_advances_to_next_prompt() -> None:
+    project = _load_real_project()
+    runtime = MiniRuntime(project)
+
+    runtime.run("__TITLE__")
+    runtime.resume(0)
+    runtime.resume(1)
+    runtime.resume(0)
+
+    text = runtime.console.visible_text()
+    assert runtime.state.waiting_for_input
+    assert "寝取机能要开启吗？" in text
+    assert "请重新输入0后回车确认" not in text
+    assert _action_ids(runtime)[-3:] == [0, 1, 2]
+
+
 def _action_ids(runtime: MiniRuntime) -> list[int]:
     return [
         int(event.choice_id)

@@ -257,6 +257,26 @@ ENDIF
     assert result.console.visible_text() == "nested"
 
 
+def test_runtime_evaluates_parenthesized_and_condition(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+RESULT = 0
+IF (RESULT >= 1) && (RESULT <= 4)
+PRINTL "edit"
+ELSEIF RESULT == 0
+PRINTL "decide"
+ENDIF
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+
+    result = run_project(project)
+
+    assert result.console.visible_text() == "decide"
+
+
 def test_runtime_stops_at_input(tmp_path: Path) -> None:
     (tmp_path / "main.erb").write_text(
         """
