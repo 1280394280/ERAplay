@@ -239,6 +239,42 @@ def test_real_project_chara_buy_page_navigation_uses_menu_inputs() -> None:
     assert "[100] 宫间奏 (500 P)" in page_0_text
 
 
+def test_real_project_shop_choice_102_enters_item_shop_and_returns() -> None:
+    project = _load_real_project()
+    runtime = MiniRuntime(project, max_steps=30000)
+
+    runtime.run("__TITLE__")
+    runtime.resume(0)
+    runtime.resume()
+    runtime.resume(1)
+    runtime.resume(0)
+    runtime.resume(0)
+    runtime.resume(0)
+    runtime.resume(102)
+
+    text = runtime.console.visible_text()
+    assert runtime.state.waiting_for_input
+    assert runtime.state.waiting_reason == "input"
+    assert "goto target=ITEM_SHOP" in runtime.trace
+    assert "call target=SALEITEM_CHECK" in runtime.trace
+    assert "item shop input waiting" in runtime.trace
+    assert "成人商店『NIGHT LOVE STORE』" in text
+    assert "拥有的物品： 摄像机(1)" in text
+    assert "[0] 跳蛋($200)" in text
+    assert "[1] 按摩棒($500)" in text
+    assert "[6] 摄像机" not in text
+    assert "[999] - 返回" in text
+
+    runtime.resume(999)
+
+    returned_text = runtime.console.visible_text()
+    assert runtime.state.waiting_for_input
+    assert runtime.state.waiting_reason == "shop"
+    assert runtime.state.variables["BOUGHT"] == -1
+    assert "[101] - 物色人才" in returned_text
+    assert "[102] - 成人商店" in returned_text
+
+
 def _action_ids(runtime: MiniRuntime) -> list[int]:
     return [
         int(event.choice_id)

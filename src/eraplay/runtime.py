@@ -63,6 +63,7 @@ class MiniRuntime:
         self.trace: list[str] = []
         self._startup_waiting = False
         self._shop_waiting = False
+        self._item_shop_waiting = False
 
     def run(self, entry: str = "EVENTFIRST") -> RuntimeResult:
         if _is_startup_entry(entry):
@@ -88,6 +89,10 @@ class MiniRuntime:
         if self._shop_waiting:
             self._shop_waiting = False
             self._resume_shop(value)
+            return RuntimeResult(self.console, self.state)
+        if self._item_shop_waiting:
+            self._item_shop_waiting = False
+            self._resume_item_shop(value)
             return RuntimeResult(self.console, self.state)
         self._run_until_wait()
         return RuntimeResult(self.console, self.state)
@@ -189,6 +194,10 @@ class MiniRuntime:
             self._wait_for_continue(command.name.lower())
         elif command.name == "DRAWLINE":
             self.console.draw_line()
+        elif command.name == "PRINT_ITEM":
+            self._print_owned_items()
+        elif command.name == "PRINT_SHOPITEM":
+            self._print_shop_item_list()
         elif command.name == "CLEAR":
             self.console.clear()
         elif command.name in {"#DIM", "#DIMS"}:
@@ -238,6 +247,11 @@ class MiniRuntime:
             self.state.waiting_for_input = True
             self.state.waiting_reason = "shop"
             self._shop_waiting = True
+        elif frame.wait_after == "item_shop":
+            self._trace("item shop input waiting")
+            self.state.waiting_for_input = True
+            self.state.waiting_reason = "input"
+            self._item_shop_waiting = True
 
     def _replace_current_frame(self, label: str) -> None:
         local_index = self._find_local_label(self.stack[-1].nodes, label)
@@ -248,7 +262,10 @@ class MiniRuntime:
         if key not in self.labels:
             raise RuntimeError(f"missing label: {label}")
         nodes, start = self.labels[key]
-        self.stack[-1] = RuntimeFrame(nodes, start + 1)
+        wait_after = "item_shop" if key == "ITEM_SHOP" else None
+        if key == "ITEM_SHOP" and self.console.current_lines and self.console.current_lines[-1]:
+            self.console.print_line()
+        self.stack[-1] = RuntimeFrame(nodes, start + 1, wait_after)
 
     def _eval_value(self, expression: str | None) -> int | str:
         if expression is None:
@@ -369,11 +386,73 @@ class MiniRuntime:
             return
         self._trace("shop handlers missing")
 
+    def _resume_item_shop(self, value: int | str | None) -> None:
+        if value == 999 or value == "999":
+            self.state.variables["BOUGHT"] = -1
+            self._push_call("SHOW_SHOP", wait_after="shop")
+            self._run_until_wait()
+            return
+        self._trace(f"item purchase unsupported value={value}")
+        self.state.waiting_for_input = True
+        self.state.waiting_reason = "input"
+        self._item_shop_waiting = True
+
     def _execute_builtin_call(self, target: str) -> bool:
+        if target.upper() == "SALEITEM_CHECK":
+            self._set_default_sale_items()
+            return True
         if target.upper() == "PRINT_SHOPCHARALIST":
             self._print_shop_chara_list()
             return True
         return False
+
+    def _set_default_sale_items(self) -> None:
+        owned = {
+            int(key.split(":", 1)[1])
+            for key, value in self.state.variables.items()
+            if key.startswith("ITEM:") and value
+        }
+        sale_ids = [
+            *(index for index in range(24) if index != 22),
+            24,
+            25,
+            29,
+            34,
+            37,
+            38,
+            39,
+            42,
+        ]
+        for item_id in range(100):
+            self.state.variables[f"ITEMSALES:{item_id}"] = 0
+        for item_id in sale_ids:
+            if item_id not in owned:
+                self.state.variables[f"ITEMSALES:{item_id}"] = 1
+
+    def _print_owned_items(self) -> None:
+        item_names = self.project.data.name_tables.get("ITEMNAME", {})
+        owned = [
+            f"{item_names[item_id]}({count})"
+            for item_id in sorted(item_names)
+            if item_id < 100
+            for count in [self._eval_value(f"ITEM:{item_id}")]
+            if isinstance(count, int) and count > 0
+        ]
+        if owned:
+            self.console.print_line(f"拥有的物品： {' '.join(owned)}")
+
+    def _print_shop_item_list(self) -> None:
+        item_names = self.project.data.name_tables.get("ITEMNAME", {})
+        prices = self.project.data.item_prices
+        entries = [
+            (item_id, item_names[item_id], prices.get(item_id, 0))
+            for item_id in sorted(item_names)
+            if item_id < 100 and self._eval_value(f"ITEMSALES:{item_id}")
+        ]
+        for offset in range(0, len(entries), 3):
+            row = entries[offset : offset + 3]
+            parts = [f"[{item_id}] {name}(${price})" for item_id, name, price in row]
+            self.console.print_line(" ".join(parts))
 
     def _print_shop_chara_list(self) -> None:
         item_names = self.project.data.name_tables.get("ITEMNAME", {})
