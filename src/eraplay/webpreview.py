@@ -48,6 +48,12 @@ class PreviewSession:
         self.add_log("restarted")
         return runtime
 
+    def switch_entry(self, entry: str) -> MiniRuntime:
+        self.entry = entry
+        runtime = self.start()
+        self.add_log(f"entry switched entry={entry}")
+        return runtime
+
     def add_log(self, message: str) -> None:
         if self.log is None:
             self.log = []
@@ -87,7 +93,7 @@ def create_preview_server(
                 runtime = session.current()
                 translation = _translation_with_mode(runtime.project.config.translation, mode)
                 self._send_json(
-                    _runtime_state(runtime, translation, session.log or [], session.error)
+                    _runtime_state(runtime, translation, session.log or [], session.error, session.entry)
                 )
             elif parsed.path == "/compat":
                 query = parse_qs(parsed.query)
@@ -104,8 +110,23 @@ def create_preview_server(
 
         def do_POST(self) -> None:
             parsed = urlparse(self.path)
-            if parsed.path not in ("/input", "/restart"):
+            if parsed.path not in ("/input", "/restart", "/entry"):
                 self.send_error(404)
+                return
+            if parsed.path == "/entry":
+                length = int(self.headers.get("content-length", "0"))
+                body = self.rfile.read(length).decode("utf-8")
+                entry = _body_value(body, self.headers.get("content-type", ""), "entry").strip()
+                if not entry:
+                    self.send_error(400, "missing entry")
+                    return
+                runtime = session.switch_entry(entry)
+                query = parse_qs(parsed.query)
+                mode = query.get("mode", [None])[0]
+                translation = _translation_with_mode(runtime.project.config.translation, mode)
+                self._send_json(
+                    _runtime_state(runtime, translation, session.log or [], session.error, session.entry)
+                )
                 return
             if parsed.path == "/restart":
                 runtime = session.restart()
@@ -113,12 +134,12 @@ def create_preview_server(
                 mode = query.get("mode", [None])[0]
                 translation = _translation_with_mode(runtime.project.config.translation, mode)
                 self._send_json(
-                    _runtime_state(runtime, translation, session.log or [], session.error)
+                    _runtime_state(runtime, translation, session.log or [], session.error, session.entry)
                 )
                 return
             length = int(self.headers.get("content-length", "0"))
             body = self.rfile.read(length).decode("utf-8")
-            value = _input_value_from_body(body, self.headers.get("content-type", ""))
+            value = _body_value(body, self.headers.get("content-type", ""), "value")
             session.add_log(f"input value={value}")
             runtime = session.current()
             if session.error is None:
@@ -131,7 +152,9 @@ def create_preview_server(
             query = parse_qs(parsed.query)
             mode = query.get("mode", [None])[0]
             translation = _translation_with_mode(runtime.project.config.translation, mode)
-            self._send_json(_runtime_state(runtime, translation, session.log or [], session.error))
+            self._send_json(
+                _runtime_state(runtime, translation, session.log or [], session.error, session.entry)
+            )
 
         def log_message(self, format: str, *args: object) -> None:
             return
@@ -163,6 +186,7 @@ def _runtime_state(
     translation=None,
     event_log: list[str] | None = None,
     error: str | None = None,
+    entry: str | None = None,
 ) -> dict[str, object]:
     info: list[str] = [_status_line(runtime)]
     if error is not None:
@@ -188,6 +212,7 @@ def _runtime_state(
         "waiting": runtime.state.waiting_for_input,
         "translation_mode": translation.display_mode.value if translation is not None else "original",
         "status": {
+            "entry": entry,
             "waiting": runtime.state.waiting_for_input,
             "steps": runtime.state.steps,
             "result": runtime.state.result,
@@ -262,15 +287,19 @@ def _coerce_input(value: str) -> int | str:
 
 
 def _input_value_from_body(body: str, content_type: str) -> str:
+    return _body_value(body, content_type, "value")
+
+
+def _body_value(body: str, content_type: str, key: str) -> str:
     if "application/json" in content_type:
         try:
             payload = json.loads(body or "{}")
         except json.JSONDecodeError:
             return ""
-        value = payload.get("value", "") if isinstance(payload, dict) else ""
+        value = payload.get(key, "") if isinstance(payload, dict) else ""
         return str(value)
     data = parse_qs(body)
-    return data.get("value", [""])[0]
+    return data.get(key, [""])[0]
 
 
 def _query_int(query: dict[str, list[str]], key: str, default: int) -> int:
@@ -309,6 +338,7 @@ PAGE_HTML = """<!doctype html>
     #history { padding: 14px; color: #888; overflow: auto; white-space: pre-wrap; }
     #compat { padding: 10px 14px; border-top: 1px solid #333; color: #d5e5a3; overflow: auto; white-space: pre-wrap; font-size: 12px; }
     #entries { padding: 10px 14px; border-top: 1px solid #333; color: #f2c078; overflow: auto; white-space: pre-wrap; font-size: 12px; }
+    #entries button { display: block; width: 100%; margin-top: 6px; padding: 5px 7px; text-align: left; font-size: 12px; }
     #log { padding: 10px 14px; border-top: 1px solid #333; color: #8ab4f8; overflow: auto; white-space: pre-wrap; font-size: 12px; }
     #actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px; border-top: 1px solid #333; min-height: 44px; }
     button { background: #1b2a2f; color: #e8f8ff; border: 1px solid #39616c; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
@@ -374,9 +404,22 @@ PAGE_HTML = """<!doctype html>
     }
     async function refreshEntries() {
       const report = await fetch('/entries?top=6').then(r => r.json());
-      const entries = report.entries.map(item => `${item.name} (${item.detail})`).join('\\n');
-      document.querySelector('#entries').textContent =
-        `entries=${report.count}` + (entries ? `\\n${entries}` : '');
+      const entries = document.querySelector('#entries');
+      entries.replaceChildren(document.createTextNode(`entries=${report.count}\\n`), ...report.entries.map(item => {
+        const button = document.createElement('button');
+        button.textContent = item.name;
+        button.title = `${item.detail} ${item.file}:${item.line}`;
+        button.onclick = async () => {
+          await fetch(`/entry?mode=${encodeURIComponent(mode)}`, {
+            method: 'POST',
+            headers: {'content-type': 'application/x-www-form-urlencoded'},
+            body: new URLSearchParams({entry: item.name})
+          });
+          await refresh();
+          await refreshEntries();
+        };
+        return button;
+      }));
     }
     document.querySelectorAll('.modes button').forEach(button => {
       button.onclick = async () => {

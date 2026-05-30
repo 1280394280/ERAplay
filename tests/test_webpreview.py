@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from eraplay.webpreview import (
+    _body_value,
     _compat_state,
     _entry_state,
     _input_value_from_body,
@@ -122,8 +123,35 @@ def test_webpreview_missing_entry_keeps_server_usable(tmp_path: Path) -> None:
     assert compat["status"] == "ok"
 
 
+def test_webpreview_can_switch_entry_after_missing_entry(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text("@EVENTFIRST\nPRINTL \"ok\"\n", encoding="utf-8")
+    server = create_preview_server(tmp_path, entry="MISSING", port=0)
+    try:
+        server.session.switch_entry("EVENTFIRST")
+        runtime = server.session.current()
+        state = _runtime_state(
+            runtime,
+            runtime.project.config.translation,
+            server.session.log,
+            server.session.error,
+            server.session.entry,
+        )
+    finally:
+        server.server_close()
+
+    assert state["status"]["entry"] == "EVENTFIRST"
+    assert state["status"]["error"] is None
+    assert state["main"] == ["ok"]
+    assert state["log"][-1] == "entry switched entry=EVENTFIRST"
+
+
 def test_webpreview_input_body_accepts_json() -> None:
     assert _input_value_from_body('{"value": "2"}', "application/json") == "2"
+
+
+def test_webpreview_body_value_accepts_entry_json() -> None:
+    assert _body_value('{"entry": "EVENTFIRST"}', "application/json", "entry") == "EVENTFIRST"
+    assert _body_value("entry=DEMO_MENU", "application/x-www-form-urlencoded", "entry") == "DEMO_MENU"
 
 
 def test_webpreview_compat_state_reports_fixture_ok() -> None:
