@@ -114,6 +114,42 @@ INPUT
     assert {"id": "999", "text": "Return"} in state["actions"]
 
 
+def test_webpreview_item_shop_state_includes_structured_screen(tmp_path: Path) -> None:
+    _write_item_shop_fixture(tmp_path)
+    server = create_preview_server(tmp_path, entry="EVENTFIRST", port=0)
+    try:
+        runtime = server.session.current()
+        state = _runtime_state(runtime, runtime.project.config.translation, server.session.log)
+    finally:
+        server.server_close()
+
+    assert state["status"]["waiting_reason"] == "input"
+    assert state["screen"]["type"] == "item_shop"
+    assert state["screen"]["title"] == "Item Shop"
+    assert state["screen"]["money"] == 1000
+    assert state["screen"]["owned_items"] == [{"id": 6, "name": "Camera", "count": 1}]
+    assert {"id": 0, "name": "Toy", "price": 200, "owned": 0, "enabled": True} in state["screen"]["items"]
+    assert state["screen"]["return_action"]["id"] == "999"
+
+
+def test_webpreview_item_purchase_confirmation_has_structured_screen(tmp_path: Path) -> None:
+    _write_item_shop_fixture(tmp_path)
+    server = create_preview_server(tmp_path, entry="EVENTFIRST", port=0)
+    try:
+        runtime = server.session.current()
+        runtime.resume(0)
+        state = _runtime_state(runtime, runtime.project.config.translation, server.session.log)
+    finally:
+        server.server_close()
+
+    assert state["status"]["waiting_reason"] == "input"
+    assert state["screen"]["type"] == "item_purchase_confirm"
+    assert state["screen"]["item"] == {"id": 0, "name": "Toy", "price": 200, "owned": 1}
+    assert state["screen"]["money"] == 800
+    assert state["screen"]["confirm_action"]["id"] == "0"
+    assert state["screen"]["cancel_action"]["id"] == "1"
+
+
 def test_webpreview_translation_mode_override() -> None:
     server = create_preview_server(ROOT / "fixtures", entry="DEMO_MENU", port=0)
     try:
@@ -299,3 +335,42 @@ def test_webpreview_entry_state_prioritizes_eventfirst(tmp_path: Path) -> None:
 def test_webpreview_query_int_uses_default_for_bad_values() -> None:
     assert _query_int({"top": ["3"]}, "top", 5) == 3
     assert _query_int({"top": ["bad"]}, "top", 5) == 5
+
+
+def _write_item_shop_fixture(path: Path) -> None:
+    (path / "CSV").mkdir()
+    (path / "CSV" / "Item.csv").write_text(
+        "0,Toy,200\n1,Rope,500\n6,Camera,1000\n",
+        encoding="utf-8",
+    )
+    (path / "main.erb").write_text(
+        """
+@EVENTFIRST
+MONEY = 1000
+ITEM:6 = 1
+GOTO ITEM_SHOP
+
+@ITEM_SHOP
+CALL SALEITEM_CHECK
+PRINTL "Item Shop"
+PRINT_ITEM
+PRINT_SHOPITEM
+PRINTL "[999] - Back"
+
+@EVENTBUY
+PRINTFORML Buy %ITEMNAME:BOUGHT%?
+PRINTL [0] - Yes
+PRINTL [1] - No
+INPUT
+IF RESULT == 1
+    ITEM:BOUGHT -= 1
+    BOUGHT = 0
+    MONEY = 1000
+    RETURN 0
+ENDIF
+PRINTFORML Bought %ITEMNAME:BOUGHT%
+WAIT
+RETURN 1
+""",
+        encoding="utf-8",
+    )

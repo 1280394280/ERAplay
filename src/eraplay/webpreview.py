@@ -237,11 +237,13 @@ def _runtime_state(
         actions = []
     elif runtime.state.waiting_reason == "continue":
         actions = [{"id": "", "text": "继续"}]
+    screen = _screen_state(runtime, actions, main)
     return {
         "info": info,
         "main": main,
         "actions": actions,
         "history": history,
+        "screen": screen,
         "waiting": runtime.state.waiting_for_input,
         "translation_mode": translation.display_mode.value if translation is not None else "original",
         "status": {
@@ -258,6 +260,99 @@ def _runtime_state(
 
 def _combined_log(session: PreviewSession, runtime: MiniRuntime) -> list[str]:
     return [*(session.log or []), *runtime.trace]
+
+
+def _screen_state(
+    runtime: MiniRuntime,
+    actions: list[dict[str, object]],
+    main: list[str],
+) -> dict[str, object] | None:
+    context = runtime.state.input_context
+    if runtime.state.waiting_for_input and context is not None and context.kind == "item_shop":
+        return _item_shop_screen(runtime, actions, main)
+    if runtime.state.waiting_for_input and runtime.state.waiting_reason == "input":
+        return _item_purchase_confirm_screen(runtime, actions, main)
+    return None
+
+
+def _item_shop_screen(
+    runtime: MiniRuntime,
+    actions: list[dict[str, object]],
+    main: list[str],
+) -> dict[str, object]:
+    item_names = runtime.project.data.name_tables.get("ITEMNAME", {})
+    action_ids = {str(action.get("id", "")) for action in actions}
+    items = [
+        {
+            "id": item_id,
+            "name": item_names[item_id],
+            "price": runtime.project.data.item_prices.get(item_id, 0),
+            "owned": runtime._eval_int(f"ITEM:{item_id}"),
+            "enabled": str(item_id) in action_ids and runtime._eval_value(f"ITEMSALES:{item_id}") != 0,
+        }
+        for item_id in sorted(item_names)
+        if item_id < 100 and str(item_id) in action_ids
+    ]
+    return_action = next((action for action in actions if str(action.get("id", "")) == "999"), None)
+    return {
+        "type": "item_shop",
+        "title": _item_shop_title(main),
+        "money": runtime._eval_int("MONEY"),
+        "owned_items": _owned_items(runtime),
+        "items": items,
+        "return_action": return_action,
+    }
+
+
+def _item_purchase_confirm_screen(
+    runtime: MiniRuntime,
+    actions: list[dict[str, object]],
+    main: list[str],
+) -> dict[str, object] | None:
+    action_ids = {str(action.get("id", "")) for action in actions}
+    if not {"0", "1"}.issubset(action_ids):
+        return None
+    item_id = runtime._eval_int("BOUGHT")
+    item_names = runtime.project.data.name_tables.get("ITEMNAME", {})
+    item_name = item_names.get(item_id)
+    if item_name is None:
+        return None
+    main_text = "\n".join(main)
+    if item_name not in main_text or not any(marker in main_text for marker in ("购入", "购买", "Buy")):
+        return None
+    return {
+        "type": "item_purchase_confirm",
+        "title": "确认购买",
+        "item": {
+            "id": item_id,
+            "name": item_name,
+            "price": runtime.project.data.item_prices.get(item_id, 0),
+            "owned": runtime._eval_int(f"ITEM:{item_id}"),
+        },
+        "money": runtime._eval_int("MONEY"),
+        "confirm_action": next((action for action in actions if str(action.get("id", "")) == "0"), None),
+        "cancel_action": next((action for action in actions if str(action.get("id", "")) == "1"), None),
+    }
+
+
+def _owned_items(runtime: MiniRuntime) -> list[dict[str, object]]:
+    item_names = runtime.project.data.name_tables.get("ITEMNAME", {})
+    return [
+        {"id": item_id, "name": item_names[item_id], "count": count}
+        for item_id in sorted(item_names)
+        for count in [runtime._eval_int(f"ITEM:{item_id}")]
+        if count > 0
+    ]
+
+
+def _item_shop_title(main: list[str]) -> str:
+    for line in main:
+        stripped = line.strip()
+        if not stripped or set(stripped) <= {"-"}:
+            continue
+        if "SHOP" in stripped.upper() or "商店" in stripped:
+            return stripped
+    return "Item Shop"
 
 
 def _compat_state(runtime: MiniRuntime, top: int = 5) -> dict[str, object]:
@@ -375,6 +470,22 @@ PAGE_HTML = """<!doctype html>
     #info { padding: 10px 14px; border-bottom: 1px solid #222; color: #c9f2ff; min-height: 22px; font-size: 13px; }
     main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; min-height: 0; overflow: hidden; }
     #main { padding: 14px; white-space: pre-wrap; line-height: 1.55; overflow: auto; }
+    #main.modern { white-space: normal; line-height: 1.35; }
+    .screen { min-height: 100%; display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 14px; }
+    .screen-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; border-bottom: 1px solid #24404a; padding-bottom: 12px; }
+    .screen-title { font-size: 22px; color: #e8f8ff; }
+    .screen-meta { color: #a8d7e5; font-size: 14px; display: flex; gap: 14px; flex-wrap: wrap; justify-content: flex-end; }
+    .owned-list { color: #b9c7cd; font-size: 13px; min-height: 20px; }
+    .item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; overflow: auto; align-content: start; padding-right: 2px; }
+    .item-card { border: 1px solid #315462; background: #0f2028; border-radius: 6px; padding: 12px; min-height: 86px; display: grid; grid-template-rows: auto 1fr auto; gap: 8px; text-align: left; }
+    .item-card:hover { background: #16303b; }
+    .item-name { font-size: 16px; color: #f2fbff; overflow-wrap: anywhere; }
+    .item-price { color: #f2c078; font-size: 14px; }
+    .item-owned { color: #8fa5ad; font-size: 12px; }
+    .confirm-panel { max-width: 520px; align-self: center; justify-self: center; border: 1px solid #315462; border-radius: 6px; background: #0f2028; padding: 20px; display: grid; gap: 16px; }
+    .confirm-title { color: #e8f8ff; font-size: 22px; }
+    .confirm-item { display: flex; justify-content: space-between; gap: 18px; color: #d8e8ee; }
+    .confirm-actions { display: flex; gap: 10px; flex-wrap: wrap; }
     aside { border-left: 1px solid #333; display: grid; grid-template-rows: minmax(0, 1fr) 120px 120px 160px; min-height: 0; overflow: hidden; }
     #history { padding: 14px; color: #888; overflow: auto; white-space: pre-wrap; }
     #compat { padding: 10px 14px; border-top: 1px solid #333; color: #d5e5a3; overflow: auto; white-space: pre-wrap; font-size: 12px; }
@@ -419,29 +530,107 @@ PAGE_HTML = """<!doctype html>
     async function refresh() {
       const state = await fetch(`/state?mode=${encodeURIComponent(mode)}`).then(r => r.json());
       document.querySelector('#info').textContent = state.info.join('\\n');
-      document.querySelector('#main').textContent = state.main.join('\\n');
+      renderMain(state);
       document.querySelector('#history').textContent = state.history.join('\\n');
       document.querySelector('#log').textContent = state.log.join('\\n');
       document.querySelectorAll('.modes button').forEach(button => {
         button.classList.toggle('active', button.dataset.mode === mode);
       });
       const actions = document.querySelector('#actions');
-      actions.replaceChildren(...state.actions.map(action => {
+      const footerActions = state.screen ? [] : state.actions;
+      actions.replaceChildren(...footerActions.map(action => {
         const button = document.createElement('button');
         button.textContent = `${action.id}: ${action.text}`;
         if (action.target) button.title = action.target;
         button.disabled = action.enabled === false;
         button.onclick = async () => {
           if (button.disabled) return;
-          await fetch('/input', {
-            method: 'POST',
-            headers: {'content-type': 'application/x-www-form-urlencoded'},
-            body: new URLSearchParams({value: action.id})
-          });
-          await refresh();
+          await sendInput(action.id);
         };
         return button;
       }));
+    }
+    function renderMain(state) {
+      const main = document.querySelector('#main');
+      main.classList.toggle('modern', Boolean(state.screen));
+      if (!state.screen) {
+        main.textContent = state.main.join('\\n');
+        return;
+      }
+      if (state.screen.type === 'item_shop') {
+        main.replaceChildren(renderItemShop(state.screen));
+        return;
+      }
+      if (state.screen.type === 'item_purchase_confirm') {
+        main.replaceChildren(renderPurchaseConfirm(state.screen));
+        return;
+      }
+      main.textContent = state.main.join('\\n');
+    }
+    function renderItemShop(screen) {
+      const root = element('div', 'screen');
+      const head = element('div', 'screen-head');
+      head.append(element('div', 'screen-title', screen.title || 'Item Shop'));
+      const meta = element('div', 'screen-meta');
+      meta.append(element('span', '', `所持金 ${screen.money}円`));
+      if (screen.return_action) meta.append(actionButton(screen.return_action, '返回'));
+      head.append(meta);
+      root.append(head);
+      const owned = element('div', 'owned-list');
+      owned.textContent = screen.owned_items.length
+        ? `持有 ${screen.owned_items.map(item => `${item.name}(${item.count})`).join('  ')}`
+        : '没有持有道具';
+      root.append(owned);
+      const grid = element('div', 'item-grid');
+      for (const item of screen.items) {
+        const button = element('button', 'item-card');
+        button.disabled = item.enabled === false;
+        button.onclick = () => sendInput(item.id);
+        button.append(element('span', 'item-name', item.name));
+        button.append(element('span', 'item-price', `${item.price}円`));
+        button.append(element('span', 'item-owned', item.owned ? `持有 ${item.owned}` : '未持有'));
+        grid.append(button);
+      }
+      root.append(grid);
+      return root;
+    }
+    function renderPurchaseConfirm(screen) {
+      const root = element('div', 'screen');
+      const panel = element('div', 'confirm-panel');
+      panel.append(element('div', 'confirm-title', screen.title || '确认购买'));
+      const item = element('div', 'confirm-item');
+      item.append(element('strong', '', screen.item.name));
+      item.append(element('span', '', `${screen.item.price}円`));
+      panel.append(item);
+      panel.append(element('div', '', `购买后所持金 ${screen.money}円`));
+      const buttons = element('div', 'confirm-actions');
+      if (screen.confirm_action) buttons.append(actionButton(screen.confirm_action, '购买'));
+      if (screen.cancel_action) buttons.append(actionButton(screen.cancel_action, '取消'));
+      panel.append(buttons);
+      root.append(panel);
+      return root;
+    }
+    function actionButton(action, fallback) {
+      const button = document.createElement('button');
+      button.textContent = fallback || `${action.id}: ${action.text}`;
+      if (action.target) button.title = action.target;
+      button.disabled = action.enabled === false;
+      button.onclick = () => sendInput(action.id);
+      return button;
+    }
+    function element(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+    async function sendInput(value) {
+      await fetch('/input', {
+        method: 'POST',
+        headers: {'content-type': 'application/x-www-form-urlencoded'},
+        body: new URLSearchParams({value})
+      });
+      await refresh();
     }
     async function refreshCompat() {
       const report = await fetch('/compat?top=5').then(r => r.json());
