@@ -34,6 +34,36 @@ RETURN 0
     assert result.console.visible_text() == "hello\ndone"
 
 
+def test_runtime_records_call_trace(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+CALL GREET
+
+@GREET
+RETURN 0
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+    runtime = MiniRuntime(project)
+
+    runtime.run()
+
+    assert runtime.trace == ["call entry=EVENTFIRST", "call target=GREET"]
+
+
+def test_runtime_records_ignored_command_trace(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text("@EVENTFIRST\nWAIT 10\nINPUT\n", encoding="utf-8")
+    project = load_project(tmp_path)
+    runtime = MiniRuntime(project)
+
+    runtime.run()
+
+    assert "ignored command=WAIT" in runtime.trace
+    assert "input waiting" in runtime.trace
+
+
 def test_runtime_assigns_simple_values(tmp_path: Path) -> None:
     (tmp_path / "main.erb").write_text(
         """

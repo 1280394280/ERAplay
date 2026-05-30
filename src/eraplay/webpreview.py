@@ -93,7 +93,13 @@ def create_preview_server(
                 runtime = session.current()
                 translation = _translation_with_mode(runtime.project.config.translation, mode)
                 self._send_json(
-                    _runtime_state(runtime, translation, session.log or [], session.error, session.entry)
+                    _runtime_state(
+                        runtime,
+                        translation,
+                        _combined_log(session, runtime),
+                        session.error,
+                        session.entry,
+                    )
                 )
             elif parsed.path == "/compat":
                 query = parse_qs(parsed.query)
@@ -125,7 +131,13 @@ def create_preview_server(
                 mode = query.get("mode", [None])[0]
                 translation = _translation_with_mode(runtime.project.config.translation, mode)
                 self._send_json(
-                    _runtime_state(runtime, translation, session.log or [], session.error, session.entry)
+                    _runtime_state(
+                        runtime,
+                        translation,
+                        _combined_log(session, runtime),
+                        session.error,
+                        session.entry,
+                    )
                 )
                 return
             if parsed.path == "/restart":
@@ -134,7 +146,13 @@ def create_preview_server(
                 mode = query.get("mode", [None])[0]
                 translation = _translation_with_mode(runtime.project.config.translation, mode)
                 self._send_json(
-                    _runtime_state(runtime, translation, session.log or [], session.error, session.entry)
+                    _runtime_state(
+                        runtime,
+                        translation,
+                        _combined_log(session, runtime),
+                        session.error,
+                        session.entry,
+                    )
                 )
                 return
             length = int(self.headers.get("content-length", "0"))
@@ -153,7 +171,13 @@ def create_preview_server(
             mode = query.get("mode", [None])[0]
             translation = _translation_with_mode(runtime.project.config.translation, mode)
             self._send_json(
-                _runtime_state(runtime, translation, session.log or [], session.error, session.entry)
+                _runtime_state(
+                    runtime,
+                    translation,
+                    _combined_log(session, runtime),
+                    session.error,
+                    session.entry,
+                )
             )
 
         def log_message(self, format: str, *args: object) -> None:
@@ -220,6 +244,10 @@ def _runtime_state(
         },
         "log": event_log or [],
     }
+
+
+def _combined_log(session: PreviewSession, runtime: MiniRuntime) -> list[str]:
+    return [*(session.log or []), *runtime.trace]
 
 
 def _compat_state(runtime: MiniRuntime, top: int = 5) -> dict[str, object]:

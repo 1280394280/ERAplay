@@ -48,13 +48,15 @@ class RuntimeError(Exception):
 
 
 class MiniRuntime:
-    def __init__(self, project: EraProject, max_steps: int = 10000) -> None:
+    def __init__(self, project: EraProject, max_steps: int = 10000, max_trace: int = 200) -> None:
         self.project = project
         self.console = ClassicConsoleBuffer()
         self.state = RuntimeState()
         self.labels = self._collect_labels(project)
         self.stack: list[RuntimeFrame] = []
         self.max_steps = max_steps
+        self.max_trace = max_trace
+        self.trace: list[str] = []
 
     def run(self, entry: str = "EVENTFIRST") -> RuntimeResult:
         self.call(entry)
@@ -74,6 +76,7 @@ class MiniRuntime:
         if key not in self.labels:
             raise RuntimeError(f"missing label: {label}")
         nodes, start = self.labels[key]
+        self._trace(f"call entry={key}")
         self.stack.append(RuntimeFrame(nodes, start + 1))
         self._run_until_wait()
         return self.state.result
@@ -117,9 +120,11 @@ class MiniRuntime:
         if isinstance(node, EndSelect):
             return index + 1
         if isinstance(node, Call):
+            self._trace(f"call target={node.target}")
             self._push_call(node.target)
             return index + 1
         if isinstance(node, Goto):
+            self._trace(f"goto target={node.target}")
             self._replace_current_frame(node.target)
             return self.stack[-1].index
         self._execute_node(node)
@@ -142,8 +147,11 @@ class MiniRuntime:
         elif command.name == "CLEAR":
             self.console.clear()
         elif command.name == "INPUT":
+            self._trace("input waiting")
             self.state.waiting_for_input = True
             return
+        else:
+            self._trace(f"ignored command={command.name}")
 
     def _push_call(self, label: str) -> None:
         key = label.upper()
@@ -277,6 +285,11 @@ class MiniRuntime:
             if isinstance(node, Label) and node.is_local and node.name.upper() == normalized:
                 return index
         return None
+
+    def _trace(self, message: str) -> None:
+        self.trace.append(message)
+        if len(self.trace) > self.max_trace:
+            del self.trace[: len(self.trace) - self.max_trace]
 
 
 def run_project(project: EraProject, entry: str = "EVENTFIRST") -> RuntimeResult:

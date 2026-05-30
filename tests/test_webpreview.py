@@ -2,6 +2,7 @@ from pathlib import Path
 
 from eraplay.webpreview import (
     _body_value,
+    _combined_log,
     _compat_state,
     _entry_state,
     _input_value_from_body,
@@ -100,6 +101,19 @@ def test_webpreview_state_includes_event_log() -> None:
         server.server_close()
 
     assert state["log"] == ["started entry=DEMO_MENU"]
+
+
+def test_webpreview_combined_log_includes_runtime_trace() -> None:
+    server = create_preview_server(ROOT / "fixtures", entry="DEMO_MENU", port=0)
+    try:
+        runtime = server.session.current()
+        log = _combined_log(server.session, runtime)
+    finally:
+        server.server_close()
+
+    assert "started entry=DEMO_MENU" in log
+    assert "call entry=DEMO_MENU" in log
+    assert "input waiting" in log
 
 
 def test_webpreview_missing_entry_keeps_server_usable(tmp_path: Path) -> None:
