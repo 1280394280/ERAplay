@@ -13,3 +13,9 @@ def test_logical_lines_skip_blank_and_comments() -> None:
 
     assert [line.text for line in lines] == ['PRINTL "a;b"', "PRINTL c"]
     assert lines[0].span.line == 3
+
+
+def test_logical_lines_preserve_full_width_layout_spaces() -> None:
+    lines = iter_logical_lines("PRINT [1] 姓氏\u3000\u3000\u3000\n")
+
+    assert lines[0].text == "PRINT [1] 姓氏\u3000\u3000\u3000"

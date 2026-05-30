@@ -60,6 +60,30 @@ def test_parse_basic_erb_subset() -> None:
     assert isinstance(program.nodes[7], EndIf)
 
 
+def test_parse_string_assignment_with_apostrophe_marker() -> None:
+    program = parse_source("@EVENTFIRST\nCALLNAME:0 '= \"Demo\"\n")
+
+    assert isinstance(program.nodes[1], Assignment)
+    assert program.nodes[1].target == "CALLNAME:0"
+    assert program.nodes[1].expression == '"Demo"'
+
+
+def test_parse_dims_keeps_raw_declaration() -> None:
+    program = parse_source('#DIMS TMP_LNAME,2 = "宫间","みやま"\n')
+
+    assert isinstance(program.nodes[0], Command)
+    assert program.nodes[0].name == "#DIMS"
+    assert program.nodes[0].args == ('TMP_LNAME,2 = "宫间","みやま"',)
+
+
+def test_parse_print_form_preserves_layout_spaces() -> None:
+    program = parse_source("PRINTPLAINFORM     -    <hint>\n")
+
+    assert isinstance(program.nodes[0], Command)
+    assert program.nodes[0].name == "PRINTPLAINFORM"
+    assert program.nodes[0].args == ("    -    <hint>",)
+
+
 def test_parse_function_label() -> None:
     program = parse_source("@CALC\nRETURN 1")
 

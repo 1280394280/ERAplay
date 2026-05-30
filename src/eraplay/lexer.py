@@ -32,7 +32,7 @@ def strip_comment(line: str) -> str:
 def iter_logical_lines(source: str, filename: str = "<memory>") -> list[LogicalLine]:
     lines: list[LogicalLine] = []
     for line_no, raw_line in enumerate(source.splitlines(), start=1):
-        text = strip_comment(raw_line).strip()
+        text = strip_comment(raw_line).strip(" \t")
         if not text:
             continue
         lines.append(LogicalLine(text=text, span=SourceSpan(filename, line_no)))

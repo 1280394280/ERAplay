@@ -142,13 +142,19 @@ class MiniRuntime:
     def _execute_command(self, command: Command) -> None:
         text = " ".join(command.args)
         if command.name == "PRINT":
-            self.console.print(self._unquote(text))
+            self.console.print(self._format_text(text))
         elif command.name == "PRINTL":
-            self.console.print_line(self._unquote(text))
+            self.console.print_line(self._format_text(text))
+        elif command.name in {"PRINTFORM", "PRINTPLAINFORM"}:
+            self.console.print(self._format_text(text))
+        elif command.name in {"PRINTFORML", "PRINTFORMW"}:
+            self.console.print_line(self._format_text(text))
         elif command.name == "DRAWLINE":
             self.console.draw_line()
         elif command.name == "CLEAR":
             self.console.clear()
+        elif command.name in {"#DIM", "#DIMS"}:
+            self._execute_dim(command)
         elif command.name == "INPUT":
             self._trace("input waiting")
             self.state.waiting_for_input = True
@@ -178,17 +184,48 @@ class MiniRuntime:
         if expression is None:
             return 0
         expression = expression.strip()
+        if _is_percent_wrapped(expression):
+            return self._eval_value(expression[1:-1])
         if _is_quoted(expression):
             return self._unquote(expression)
         if re.fullmatch(r"-?\d+", expression):
             return int(expression)
         if "+" in expression:
-            total = 0
+            values: list[int | str] = []
             for part in expression.split("+"):
-                value = self._eval_value(part)
-                total += int(value)
-            return total
+                values.append(self._eval_value(part))
+            if all(isinstance(value, int) for value in values):
+                return sum(int(value) for value in values)
+            return "".join(str(value) for value in values)
         return self.state.variables.get(expression.upper(), 0)
+
+    def _execute_dim(self, command: Command) -> None:
+        if not command.args:
+            return
+        declaration = command.args[0]
+        left, separator, right = declaration.partition("=")
+        target = left.split(",", 1)[0].strip().upper()
+        if not target:
+            return
+        if not separator:
+            self.state.variables.setdefault(target, "")
+            return
+        values = [_strip_optional_percent(part.strip()) for part in _split_csv_like(right)]
+        for index, value in enumerate(values):
+            key = target if index == 0 else f"{target}:{index}"
+            self.state.variables[key] = self._eval_value(value)
+
+    def _format_text(self, text: str) -> str:
+        unquoted = _unquote_print_text(text)
+
+        def replace_percent(match: re.Match[str]) -> str:
+            return str(self._eval_value(match.group(1)))
+
+        def replace_brace(match: re.Match[str]) -> str:
+            return str(self._eval_value(match.group(1)))
+
+        formatted = re.sub(r"%([^%]+)%", replace_percent, unquoted)
+        return re.sub(r"\{([^{}]+)\}", replace_brace, formatted)
 
     def _eval_condition(self, expression: str) -> bool:
         for operator in (">=", "<=", "==", "!=", ">", "<"):
@@ -303,6 +340,52 @@ def run_project(project: EraProject, entry: str = "EVENTFIRST") -> RuntimeResult
 
 def _is_quoted(text: str) -> bool:
     return len(text) >= 2 and text[0] == '"' and text[-1] == '"'
+
+
+def _unquote_print_text(text: str) -> str:
+    stripped = text.strip()
+    if _is_quoted(stripped):
+        return stripped[1:-1]
+    return text
+
+
+def _is_percent_wrapped(text: str) -> bool:
+    return len(text) >= 2 and text[0] == "%" and text[-1] == "%"
+
+
+def _strip_optional_percent(text: str) -> str:
+    if _is_percent_wrapped(text):
+        return text[1:-1]
+    return text
+
+
+def _split_csv_like(text: str) -> list[str]:
+    parts: list[str] = []
+    start = 0
+    depth = 0
+    in_string = False
+    escaped = False
+    for index, char in enumerate(text):
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\":
+            escaped = True
+            continue
+        if char == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth = max(depth - 1, 0)
+        elif char == "," and depth == 0:
+            parts.append(text[start:index])
+            start = index + 1
+    parts.append(text[start:])
+    return parts
 
 
 def _compare_values(left: int | str, right: int | str, operator: str) -> bool:

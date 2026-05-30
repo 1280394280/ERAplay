@@ -24,7 +24,9 @@ from eraplay.ast import (
 from eraplay.diagnostics import Diagnostic, EraPlaySyntaxError
 from eraplay.lexer import LogicalLine, iter_logical_lines
 
-_ASSIGN_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*(?:\s*:\s*\d+)?(?:\s*\([^)]*\))?)\s*=\s*(.+)$")
+_ASSIGN_RE = re.compile(
+    r"^([A-Za-z_][A-Za-z0-9_]*(?:\s*:\s*[A-Za-z0-9_]+)*(?:\s*\([^)]*\))?)\s*'?\s*=\s*(.+)$"
+)
 
 
 def parse_source(source: str, filename: str = "<memory>") -> Program:
@@ -70,6 +72,16 @@ def parse_line(line: LogicalLine) -> Node:
     if upper.startswith("CASE "):
         values = tuple(part.strip() for part in _split_csv_like(text[5:].strip()) if part.strip())
         return Case(line.span, values)
+
+    if upper.startswith("#DIM "):
+        return Command(line.span, "#DIM", (text[5:].strip(),))
+
+    if upper.startswith("#DIMS "):
+        return Command(line.span, "#DIMS", (text[6:].strip(),))
+
+    print_command = _match_raw_text_command(text)
+    if print_command is not None:
+        return Command(line.span, print_command[0], (print_command[1],))
 
     if upper.startswith("CALL "):
         target, args = _split_head_args(text[5:].strip(), line.span)
@@ -128,6 +140,24 @@ def _find_head_end(text: str) -> int | None:
     for index, char in enumerate(text):
         if char.isspace() or char == ",":
             return index
+    return None
+
+
+def _match_raw_text_command(text: str) -> tuple[str, str] | None:
+    upper = text.upper()
+    for name in (
+        "PRINTPLAINFORM",
+        "PRINTFORML",
+        "PRINTFORMW",
+        "PRINTFORM",
+        "PRINTL",
+        "PRINT",
+    ):
+        if upper == name:
+            return name, ""
+        prefix = f"{name} "
+        if upper.startswith(prefix):
+            return name, text[len(prefix) :]
     return None
 
 

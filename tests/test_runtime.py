@@ -82,6 +82,45 @@ LOCAL:1 = LOCAL + 1
     assert runtime.state.variables["LOCAL:1"] == 11
 
 
+def test_runtime_assigns_string_values_with_apostrophe_marker(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+CALLNAME:0 '= "响也"
+PRINTFORML %CALLNAME:0%
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+
+    result = run_project(project)
+
+    assert result.state.variables["CALLNAME:0"] == "响也"
+    assert result.console.visible_text() == "响也"
+
+
+def test_runtime_initializes_dims_and_prints_form_text(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+#DIMS TMP_LNAME,2 = "宫间","みやま"
+PRINT [1] 姓氏\u3000\u3000\u3000
+PRINTPLAINFORM %TMP_LNAME%
+PRINTPLAINFORM     -    <姓氏不推荐改动>
+PRINTL
+PRINTFORML 读法：%TMP_LNAME:1%
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+
+    result = run_project(project)
+
+    assert result.state.variables["TMP_LNAME"] == "宫间"
+    assert result.state.variables["TMP_LNAME:1"] == "みやま"
+    assert result.console.visible_text() == "[1] 姓氏\u3000\u3000\u3000宫间    -    <姓氏不推荐改动>\n读法：みやま"
+
+
 def test_runtime_executes_if_true_branch(tmp_path: Path) -> None:
     (tmp_path / "main.erb").write_text(
         """

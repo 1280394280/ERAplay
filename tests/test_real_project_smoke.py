@@ -47,7 +47,12 @@ def test_real_project_eventfirst_reaches_name_confirmation_after_normal_input() 
 
     assert runtime.state.waiting_for_input
     assert _action_ids(runtime)[-6:] == [1, 2, 3, 4, 5, 0]
-    assert "主人公" in runtime.console.visible_text()
+    text = runtime.console.visible_text()
+    assert "主人公" in text
+    assert "宫间" in text
+    assert "响也" in text
+    assert "ignored command=PRINTPLAINFORM" not in runtime.trace
+    assert "ignored command=CALLNAME:0" not in runtime.trace
 
 
 def _action_ids(runtime: MiniRuntime) -> list[int]:
