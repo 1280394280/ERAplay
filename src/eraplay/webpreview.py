@@ -8,7 +8,7 @@ from urllib.parse import parse_qs, urlparse
 
 from eraplay.compat import build_compatibility_report
 from eraplay.project import load_project
-from eraplay.runtime import MiniRuntime
+from eraplay.runtime import MiniRuntime, RuntimeError as EraRuntimeError
 from eraplay.translation import TranslationConfig, TranslationDisplayMode, translate_event_text
 from eraplay.ui import OutputChannel, OutputKind
 
@@ -20,13 +20,21 @@ class PreviewSession:
     encoding: str | None = None
     runtime: MiniRuntime | None = None
     log: list[str] | None = None
+    error: str | None = None
 
     def start(self) -> MiniRuntime:
         project = load_project(self.project_path, preferred_encoding=self.encoding)
         runtime = MiniRuntime(project)
-        runtime.run(self.entry)
         self.runtime = runtime
-        self.log = [f"started entry={self.entry}"]
+        self.error = None
+        self.log = []
+        try:
+            runtime.run(self.entry)
+        except EraRuntimeError as error:
+            self.error = str(error)
+            self.add_log(f"start failed error={error}")
+        else:
+            self.add_log(f"started entry={self.entry}")
         return runtime
 
     def current(self) -> MiniRuntime:
@@ -77,7 +85,9 @@ def create_preview_server(
                 mode = query.get("mode", [None])[0]
                 runtime = session.current()
                 translation = _translation_with_mode(runtime.project.config.translation, mode)
-                self._send_json(_runtime_state(runtime, translation, session.log or []))
+                self._send_json(
+                    _runtime_state(runtime, translation, session.log or [], session.error)
+                )
             elif parsed.path == "/compat":
                 query = parse_qs(parsed.query)
                 top = _query_int(query, "top", 5)
@@ -96,19 +106,26 @@ def create_preview_server(
                 query = parse_qs(parsed.query)
                 mode = query.get("mode", [None])[0]
                 translation = _translation_with_mode(runtime.project.config.translation, mode)
-                self._send_json(_runtime_state(runtime, translation, session.log or []))
+                self._send_json(
+                    _runtime_state(runtime, translation, session.log or [], session.error)
+                )
                 return
             length = int(self.headers.get("content-length", "0"))
             body = self.rfile.read(length).decode("utf-8")
             value = _input_value_from_body(body, self.headers.get("content-type", ""))
             session.add_log(f"input value={value}")
             runtime = session.current()
-            runtime.console.clear()
-            runtime.resume(_coerce_input(value))
+            if session.error is None:
+                runtime.console.clear()
+                try:
+                    runtime.resume(_coerce_input(value))
+                except EraRuntimeError as error:
+                    session.error = str(error)
+                    session.add_log(f"input failed error={error}")
             query = parse_qs(parsed.query)
             mode = query.get("mode", [None])[0]
             translation = _translation_with_mode(runtime.project.config.translation, mode)
-            self._send_json(_runtime_state(runtime, translation, session.log or []))
+            self._send_json(_runtime_state(runtime, translation, session.log or [], session.error))
 
         def log_message(self, format: str, *args: object) -> None:
             return
@@ -139,8 +156,11 @@ def _runtime_state(
     runtime: MiniRuntime,
     translation=None,
     event_log: list[str] | None = None,
+    error: str | None = None,
 ) -> dict[str, object]:
     info: list[str] = [_status_line(runtime)]
+    if error is not None:
+        info.append(f"error={error}")
     main: list[str] = []
     actions: list[dict[str, str]] = []
     history: list[str] = []
@@ -165,6 +185,7 @@ def _runtime_state(
             "waiting": runtime.state.waiting_for_input,
             "steps": runtime.state.steps,
             "result": runtime.state.result,
+            "error": error,
         },
         "log": event_log or [],
     }

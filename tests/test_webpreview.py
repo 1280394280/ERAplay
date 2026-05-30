@@ -100,6 +100,27 @@ def test_webpreview_state_includes_event_log() -> None:
     assert state["log"] == ["started entry=DEMO_MENU"]
 
 
+def test_webpreview_missing_entry_keeps_server_usable(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text("@EVENTFIRST\nPRINTL \"ok\"\n", encoding="utf-8")
+    server = create_preview_server(tmp_path, entry="MISSING", port=0)
+    try:
+        runtime = server.session.current()
+        state = _runtime_state(
+            runtime,
+            runtime.project.config.translation,
+            server.session.log,
+            server.session.error,
+        )
+        compat = _compat_state(runtime)
+    finally:
+        server.server_close()
+
+    assert state["status"]["error"] == "missing label: MISSING"
+    assert "error=missing label: MISSING" in state["info"]
+    assert state["log"] == ["start failed error=missing label: MISSING"]
+    assert compat["status"] == "ok"
+
+
 def test_webpreview_input_body_accepts_json() -> None:
     assert _input_value_from_body('{"value": "2"}', "application/json") == "2"
 
