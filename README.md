@@ -22,6 +22,15 @@ and extension system.
 python -m pytest
 ```
 
+On this workstation, the test suite also uses the real erAV project when it is
+available at `D:\新建文件夹\ERA\emuera\erAV-master`. To compare against a
+different ERA game, set `ERAPLAY_REAL_PROJECT` before running tests:
+
+```powershell
+$env:ERAPLAY_REAL_PROJECT = "D:\path\to\era-game"
+python -m pytest tests\test_real_project_smoke.py
+```
+
 Check a project directory:
 
 ```powershell
