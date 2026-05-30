@@ -1,3 +1,4 @@
+import json
 from io import StringIO
 from pathlib import Path
 
@@ -103,10 +104,34 @@ def test_compatibility_report_groups_unresolved_calls(tmp_path: Path) -> None:
     assert "1: OTHER" not in text
 
 
+def test_compatibility_report_can_emit_json(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        "@EVENTFIRST\nCALL MISSING\nCALL MISSING\nCALL OTHER\n",
+        encoding="utf-8",
+    )
+    out = StringIO()
+
+    exit_code = compatibility_report(tmp_path, out=out, top=1, output_format="json")
+    data = json.loads(out.getvalue())
+
+    assert exit_code == 0
+    assert data["files"]["erb"] == 1
+    assert data["diagnostics"] == 3
+    assert data["diagnostic_kinds"] == [{"kind": "unresolved CALL", "count": 3}]
+    assert data["unresolved_calls"] == [{"target": "MISSING", "count": 2}]
+    assert data["status"] == "issues"
+
+
 def test_main_compat_command_accepts_external_call(tmp_path: Path) -> None:
     (tmp_path / "main.erb").write_text("@EVENTFIRST\nCALL MISSING\n", encoding="utf-8")
 
     assert main(["compat", str(tmp_path), "--external-call", "MISSING"]) == 0
+
+
+def test_main_compat_json_command(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text("@EVENTFIRST\nCALL MISSING\n", encoding="utf-8")
+
+    assert main(["compat", str(tmp_path), "--format", "json"]) == 0
 
 
 def test_init_project_creates_config(tmp_path: Path) -> None:

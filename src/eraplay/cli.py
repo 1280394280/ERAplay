@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 from typing import TextIO
@@ -84,12 +85,20 @@ def compatibility_report(
     out: TextIO | None = None,
     external_calls: tuple[str, ...] = (),
     top: int = 20,
+    output_format: str = "text",
 ) -> int:
     if out is None:
         out = sys.stdout
 
     project = load_project(path, preferred_encoding=encoding)
     report = build_compatibility_report(project, external_calls=external_calls)
+    if output_format == "json":
+        print(
+            json.dumps(report.to_dict(top=top, external_calls=external_calls), ensure_ascii=False),
+            file=out,
+        )
+        return 0
+
     diagnostics = report.diagnostics
     print(f"Compatibility report: {project.root}", file=out)
     print(
@@ -229,12 +238,19 @@ def _build_parser() -> argparse.ArgumentParser:
         default=20,
         help="number of unresolved CALL targets to show",
     )
+    compat.add_argument(
+        "--format",
+        choices=("text", "json"),
+        default="text",
+        help="report output format",
+    )
     compat.set_defaults(
         handler=lambda args: compatibility_report(
             args.path,
             args.encoding,
             external_calls=tuple(args.external_call),
             top=args.top,
+            output_format=args.format,
         )
     )
 

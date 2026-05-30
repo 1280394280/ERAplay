@@ -31,6 +31,28 @@ class CompatibilityReport:
     def diagnostic_kinds(self) -> Counter[str]:
         return Counter(_diagnostic_kind(diagnostic.message) for diagnostic in self.diagnostics)
 
+    def to_dict(self, top: int = 20, external_calls: tuple[str, ...] = ()) -> dict[str, object]:
+        return {
+            "project": str(self.project.root),
+            "files": {
+                "erb": len(self.project.erb_files),
+                "erh": len(self.project.erh_files),
+                "csv": len(self.project.csv_files),
+            },
+            "diagnostics": len(self.diagnostics),
+            "diagnostic_kinds": [
+                {"kind": kind, "count": count}
+                for kind, count in self.diagnostic_kinds.most_common()
+            ],
+            "unresolved_calls": [
+                {"target": name, "count": count}
+                for name, count in self.unresolved_calls.most_common(top)
+            ],
+            "excluded_dirs": list(self.project.config.exclude_dirs),
+            "external_calls": list((*self.project.config.external_calls, *external_calls)),
+            "status": "ok" if not self.diagnostics else "issues",
+        }
+
 
 def build_compatibility_report(
     project: EraProject,
