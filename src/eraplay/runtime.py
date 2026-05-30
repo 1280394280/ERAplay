@@ -29,6 +29,7 @@ class RuntimeState:
     variables: dict[str, int | str] = field(default_factory=dict)
     result: int | str | None = None
     waiting_for_input: bool = False
+    waiting_reason: str | None = None
     steps: int = 0
 
 
@@ -58,8 +59,12 @@ class MiniRuntime:
         self.max_steps = max_steps
         self.max_trace = max_trace
         self.trace: list[str] = []
+        self._startup_waiting = False
 
     def run(self, entry: str = "EVENTFIRST") -> RuntimeResult:
+        if _is_startup_entry(entry):
+            self._show_startup_screen()
+            return RuntimeResult(self.console, self.state)
         self.call(entry)
         return RuntimeResult(self.console, self.state)
 
@@ -69,6 +74,11 @@ class MiniRuntime:
         self.state.result = value
         self.state.variables["RESULT"] = value
         self.state.waiting_for_input = False
+        self.state.waiting_reason = None
+        if self._startup_waiting:
+            self._startup_waiting = False
+            self._resume_startup(value)
+            return RuntimeResult(self.console, self.state)
         self._run_until_wait()
         return RuntimeResult(self.console, self.state)
 
@@ -158,6 +168,7 @@ class MiniRuntime:
         elif command.name == "INPUT":
             self._trace("input waiting")
             self.state.waiting_for_input = True
+            self.state.waiting_reason = "input"
             return
         else:
             self._trace(f"ignored command={command.name}")
@@ -226,6 +237,49 @@ class MiniRuntime:
 
         formatted = re.sub(r"%([^%]+)%", replace_percent, unquoted)
         return re.sub(r"\{([^{}]+)\}", replace_brace, formatted)
+
+    def _show_startup_screen(self) -> None:
+        self._trace("startup screen")
+        game_base = self.project.data.game_base
+        self.console.draw_line(width=213)
+        title = _first_game_base_value(game_base, "タイトル")
+        version = _first_game_base_value(game_base, "バージョン")
+        author = _first_game_base_value(game_base, "作者")
+        year = _first_game_base_value(game_base, "製作年")
+        detail = _first_game_base_value(game_base, "追加情報")
+        if title:
+            self.console.print_line(title)
+        if version:
+            self.console.print_line(_format_gamebase_version(version))
+        if author:
+            self.console.print_line(author)
+        if year:
+            self.console.print_line(f"({year})")
+        if detail:
+            self.console.print_line(detail)
+        self.console.print_line(" ")
+        self.console.draw_line(width=213)
+        self.console.print_line("[0] 新的开始")
+        self.console.print_line("[1] 载入存档")
+        self.state.waiting_for_input = True
+        self.state.waiting_reason = "startup"
+        self._startup_waiting = True
+
+    def _resume_startup(self, value: int | str) -> None:
+        if value == 0 or value == "0":
+            self.console.clear()
+            self.call("EVENTFIRST")
+            return
+        if value == 1 or value == "1":
+            self.console.print_line("载入存档尚未实现。")
+            self.state.waiting_for_input = True
+            self.state.waiting_reason = "startup"
+            self._startup_waiting = True
+            self._trace("loadgame unsupported")
+            return
+        self.state.waiting_for_input = True
+        self.state.waiting_reason = "startup"
+        self._startup_waiting = True
 
     def _eval_condition(self, expression: str) -> bool:
         for operator in (">=", "<=", "==", "!=", ">", "<"):
@@ -336,6 +390,27 @@ class MiniRuntime:
 
 def run_project(project: EraProject, entry: str = "EVENTFIRST") -> RuntimeResult:
     return MiniRuntime(project).run(entry)
+
+
+def _is_startup_entry(entry: str) -> bool:
+    return entry.upper() in {"__TITLE__", "__STARTUP__"}
+
+
+def _first_game_base_value(data: dict[str, tuple[str, ...]], key: str) -> str | None:
+    values = data.get(key)
+    if not values:
+        return None
+    return values[0]
+
+
+def _format_gamebase_version(version: str) -> str:
+    if version.isdigit() and len(version) == 4:
+        major = version[0].lstrip("0") or "0"
+        minor = version[1:3]
+        return f"{major}.{minor}"
+    if version.isdigit() and len(version) == 3:
+        return f"0.{version[:2]}"
+    return version
 
 
 def _is_quoted(text: str) -> bool:

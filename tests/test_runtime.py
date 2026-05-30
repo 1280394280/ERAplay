@@ -14,6 +14,33 @@ def test_runtime_prints_eventfirst_output() -> None:
     assert "hello" in result.console.visible_text()
 
 
+def test_runtime_prints_gamebase_startup_screen(tmp_path: Path) -> None:
+    (tmp_path / "CSV").mkdir()
+    (tmp_path / "CSV" / "GameBase.csv").write_text(
+        "タイトル,Demo Game\nバージョン,1070\n作者,Alice\n製作年,2026\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "main.erb").write_text("@EVENTFIRST\nPRINTL \"new game\"\n", encoding="utf-8")
+    project = load_project(tmp_path)
+    runtime = MiniRuntime(project)
+
+    runtime.run("__TITLE__")
+
+    text = runtime.console.visible_text()
+    assert runtime.state.waiting_for_input is True
+    assert runtime.state.waiting_reason == "startup"
+    assert "Demo Game" in text
+    assert "1.07" in text
+    assert "[0] 新的开始" in text
+    assert "[1] 载入存档" in text
+
+    runtime.resume(0)
+
+    assert runtime.state.waiting_for_input is False
+    assert runtime.console.history_text()
+    assert runtime.console.visible_text() == "new game"
+
+
 def test_runtime_calls_function_label(tmp_path: Path) -> None:
     (tmp_path / "main.erb").write_text(
         """

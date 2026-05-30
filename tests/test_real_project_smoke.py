@@ -68,6 +68,20 @@ def test_real_emuera_log_matches_reference_startup_summary() -> None:
     assert summary.startup_screen[-2:] == ("[0] 新的开始", "[1] 载入存档")
 
 
+def test_real_project_startup_screen_uses_gamebase_like_emuera_log() -> None:
+    project = _load_real_project()
+    summary = _load_real_log()
+    runtime = MiniRuntime(project)
+
+    runtime.run("__TITLE__")
+
+    text_lines = runtime.console.visible_text().splitlines()
+    assert runtime.state.waiting_reason == "startup"
+    assert "Erav" in text_lines
+    assert "1.07" in text_lines
+    assert text_lines[-2:] == list(summary.startup_screen[-2:])
+
+
 def test_real_project_eventfirst_reaches_name_confirmation_after_normal_input() -> None:
     project = _load_real_project()
     runtime = MiniRuntime(project)

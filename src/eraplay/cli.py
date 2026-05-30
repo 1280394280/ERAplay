@@ -320,7 +320,7 @@ def _build_parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--entry",
         default="EVENTFIRST",
-        help="entry label to run",
+        help="entry label to run, or __TITLE__ for the GameBase startup screen",
     )
     run.add_argument(
         "--encoding",
@@ -333,7 +333,7 @@ def _build_parser() -> argparse.ArgumentParser:
     play.add_argument(
         "--entry",
         default="EVENTFIRST",
-        help="entry label to run",
+        help="entry label to run, or __TITLE__ for the GameBase startup screen",
     )
     play.add_argument(
         "--encoding",
@@ -343,7 +343,11 @@ def _build_parser() -> argparse.ArgumentParser:
 
     web = subparsers.add_parser("web", help="serve a minimal local web preview")
     web.add_argument("path", help="project directory to preview")
-    web.add_argument("--entry", default="DEMO_MENU", help="entry label to run")
+    web.add_argument(
+        "--entry",
+        default="DEMO_MENU",
+        help="entry label to run, or __TITLE__ for the GameBase startup screen",
+    )
     web.add_argument("--host", default="127.0.0.1", help="host to bind")
     web.add_argument("--port", type=int, default=8765, help="port to bind")
     web.add_argument(

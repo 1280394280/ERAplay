@@ -278,6 +278,8 @@ def _entry_state(runtime: MiniRuntime, top: int = 20) -> dict[str, object]:
 
 def _entry_score(name: str, detail: str) -> int:
     upper = name.upper()
+    if upper == "__TITLE__":
+        return 120
     if upper in {"EVENTFIRST", "SYSTEM_TITLE", "TITLE", "START"}:
         return 100
     if upper.startswith(("EVENT", "SYSTEM", "TITLE", "MAIN", "DEMO")):
