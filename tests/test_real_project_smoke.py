@@ -176,6 +176,33 @@ def test_real_project_shop_choice_101_enters_chara_buy_page_from_menu() -> None:
     assert "[999] - 返回" in text
 
 
+def test_real_project_chara_buy_999_returns_to_shop_menu() -> None:
+    project = _load_real_project()
+    runtime = MiniRuntime(project, max_steps=20000)
+
+    runtime.run("__TITLE__")
+    runtime.resume(0)
+    runtime.resume()
+    runtime.resume(1)
+    runtime.resume(0)
+    runtime.resume(0)
+    runtime.resume(0)
+    runtime.resume(101)
+
+    assert runtime.state.waiting_reason == "input"
+
+    runtime.resume(999)
+
+    text = runtime.console.visible_text()
+    assert runtime.state.waiting_for_input
+    assert runtime.state.waiting_reason == "shop"
+    assert "call target=CHARA_BUY_AFTER" in runtime.trace
+    assert "shop input waiting" in runtime.trace
+    assert "物色女优候补人和工作人员" in text
+    assert "[101] - 物色人才" in text
+    assert "[105] - 什么都不做" in text
+
+
 def _action_ids(runtime: MiniRuntime) -> list[int]:
     return [
         int(event.choice_id)
