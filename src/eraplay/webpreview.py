@@ -6,6 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from eraplay.compat import build_compatibility_report
 from eraplay.project import load_project
 from eraplay.runtime import MiniRuntime
 from eraplay.translation import TranslationConfig, TranslationDisplayMode, translate_event_text
@@ -77,6 +78,11 @@ def create_preview_server(
                 runtime = session.current()
                 translation = _translation_with_mode(runtime.project.config.translation, mode)
                 self._send_json(_runtime_state(runtime, translation, session.log or []))
+            elif parsed.path == "/compat":
+                query = parse_qs(parsed.query)
+                top = _query_int(query, "top", 5)
+                runtime = session.current()
+                self._send_json(_compat_state(runtime, top=top))
             else:
                 self.send_error(404)
 
@@ -164,6 +170,11 @@ def _runtime_state(
     }
 
 
+def _compat_state(runtime: MiniRuntime, top: int = 5) -> dict[str, object]:
+    report = build_compatibility_report(runtime.project)
+    return report.to_dict(top=top)
+
+
 def _translation_with_mode(
     config: TranslationConfig,
     mode: str | None,
@@ -203,6 +214,13 @@ def _input_value_from_body(body: str, content_type: str) -> str:
     return data.get("value", [""])[0]
 
 
+def _query_int(query: dict[str, list[str]], key: str, default: int) -> int:
+    try:
+        return int(query.get(key, [str(default)])[0])
+    except ValueError:
+        return default
+
+
 def _status_line(runtime: MiniRuntime) -> str:
     waiting = "waiting" if runtime.state.waiting_for_input else "running"
     result = "" if runtime.state.result is None else str(runtime.state.result)
@@ -228,8 +246,9 @@ PAGE_HTML = """<!doctype html>
     #info { padding: 10px 14px; border-bottom: 1px solid #222; color: #c9f2ff; min-height: 22px; font-size: 13px; }
     main { display: grid; grid-template-columns: 1fr 360px; min-height: 0; }
     #main { padding: 14px; white-space: pre-wrap; line-height: 1.55; overflow: auto; }
-    aside { border-left: 1px solid #333; display: grid; grid-template-rows: 1fr 160px; min-height: 0; }
+    aside { border-left: 1px solid #333; display: grid; grid-template-rows: 1fr 120px 160px; min-height: 0; }
     #history { padding: 14px; color: #888; overflow: auto; white-space: pre-wrap; }
+    #compat { padding: 10px 14px; border-top: 1px solid #333; color: #d5e5a3; overflow: auto; white-space: pre-wrap; font-size: 12px; }
     #log { padding: 10px 14px; border-top: 1px solid #333; color: #8ab4f8; overflow: auto; white-space: pre-wrap; font-size: 12px; }
     #actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px; border-top: 1px solid #333; min-height: 44px; }
     button { background: #1b2a2f; color: #e8f8ff; border: 1px solid #39616c; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
@@ -254,6 +273,7 @@ PAGE_HTML = """<!doctype html>
       <section id="main"></section>
       <aside>
         <section id="history"></section>
+        <section id="compat"></section>
         <section id="log"></section>
       </aside>
     </main>
@@ -285,6 +305,12 @@ PAGE_HTML = """<!doctype html>
         return button;
       }));
     }
+    async function refreshCompat() {
+      const report = await fetch('/compat?top=5').then(r => r.json());
+      const calls = report.unresolved_calls.map(item => `${item.count}: ${item.target}`).join('\\n');
+      document.querySelector('#compat').textContent =
+        `compat=${report.status} diagnostics=${report.diagnostics}` + (calls ? `\\n${calls}` : '');
+    }
     document.querySelectorAll('.modes button').forEach(button => {
       button.onclick = async () => {
         mode = button.dataset.mode;
@@ -296,6 +322,7 @@ PAGE_HTML = """<!doctype html>
       await refresh();
     };
     refresh();
+    refreshCompat();
   </script>
 </body>
 </html>

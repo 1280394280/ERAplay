@@ -1,6 +1,12 @@
 from pathlib import Path
 
-from eraplay.webpreview import create_preview_server, _input_value_from_body, _runtime_state
+from eraplay.webpreview import (
+    _compat_state,
+    _input_value_from_body,
+    _query_int,
+    _runtime_state,
+    create_preview_server,
+)
 from eraplay.webpreview import _translation_with_mode
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -96,3 +102,20 @@ def test_webpreview_state_includes_event_log() -> None:
 
 def test_webpreview_input_body_accepts_json() -> None:
     assert _input_value_from_body('{"value": "2"}', "application/json") == "2"
+
+
+def test_webpreview_compat_state_reports_fixture_ok() -> None:
+    server = create_preview_server(ROOT / "fixtures", entry="DEMO_MENU", port=0)
+    try:
+        state = _compat_state(server.session.current())
+    finally:
+        server.server_close()
+
+    assert state["status"] == "ok"
+    assert state["diagnostics"] == 0
+    assert state["files"]["erb"] == 6
+
+
+def test_webpreview_query_int_uses_default_for_bad_values() -> None:
+    assert _query_int({"top": ["3"]}, "top", 5) == 3
+    assert _query_int({"top": ["bad"]}, "top", 5) == 5
