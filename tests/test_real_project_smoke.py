@@ -203,6 +203,42 @@ def test_real_project_chara_buy_999_returns_to_shop_menu() -> None:
     assert "[105] - 什么都不做" in text
 
 
+def test_real_project_chara_buy_page_navigation_uses_menu_inputs() -> None:
+    project = _load_real_project()
+    runtime = MiniRuntime(project, max_steps=30000)
+
+    runtime.run("__TITLE__")
+    runtime.resume(0)
+    runtime.resume()
+    runtime.resume(1)
+    runtime.resume(0)
+    runtime.resume(0)
+    runtime.resume(0)
+    runtime.resume(101)
+
+    assert runtime.state.waiting_reason == "input"
+    assert runtime.state.variables["TFLAG:100"] == 0
+    assert "[100] 宫间奏 (500 P)" in runtime.console.visible_text()
+
+    runtime.resume(9)
+
+    page_1_text = runtime.console.visible_text()
+    assert runtime.state.waiting_reason == "input"
+    assert runtime.state.variables["TFLAG:100"] == 1
+    assert "Page1" in page_1_text
+    latest_page_1_text = page_1_text.rsplit("Page1", 1)[-1]
+    assert "魔术式跳蛋" not in latest_page_1_text
+    assert "[100] 宫间奏 (500 P)" not in latest_page_1_text
+
+    runtime.resume(1)
+
+    page_0_text = runtime.console.visible_text()
+    assert runtime.state.waiting_reason == "input"
+    assert runtime.state.variables["TFLAG:100"] == 0
+    assert "Page0" in page_0_text
+    assert "[100] 宫间奏 (500 P)" in page_0_text
+
+
 def _action_ids(runtime: MiniRuntime) -> list[int]:
     return [
         int(event.choice_id)

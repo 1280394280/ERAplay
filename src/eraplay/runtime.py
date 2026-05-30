@@ -262,13 +262,18 @@ class MiniRuntime:
             return self._unquote(expression)
         if re.fullmatch(r"-?\d+", expression):
             return int(expression)
-        if "+" in expression:
-            values: list[int | str] = []
-            for part in expression.split("+"):
-                values.append(self._eval_value(part))
+        add_parts = _split_top_level(expression, "+")
+        if len(add_parts) > 1:
+            values = [self._eval_value(part) for part in add_parts]
             if all(isinstance(value, int) for value in values):
                 return sum(int(value) for value in values)
             return "".join(str(value) for value in values)
+        subtract_parts = _split_top_level(expression, "-")
+        if len(subtract_parts) > 1:
+            values = [self._eval_value(part) for part in subtract_parts]
+            if all(isinstance(value, int) for value in values):
+                head, *tail = [int(value) for value in values]
+                return head - sum(tail)
         return self.state.variables.get(expression.upper(), 0)
 
     def _eval_int(self, expression: str | None) -> int:
@@ -375,7 +380,7 @@ class MiniRuntime:
         prices = self.project.data.item_prices
         page = self._eval_int("TFLAG:100")
         start = page * 60 + 100
-        end = start + 60
+        end = min(start + 60, 200)
         entries = [
             (index, item_names[index], prices.get(index, 0))
             for index in range(start, end)

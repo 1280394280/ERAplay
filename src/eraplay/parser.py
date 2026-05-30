@@ -25,7 +25,7 @@ from eraplay.diagnostics import Diagnostic, EraPlaySyntaxError
 from eraplay.lexer import LogicalLine, iter_logical_lines
 
 _ASSIGN_RE = re.compile(
-    r"^([A-Za-z_][A-Za-z0-9_]*(?:\s*:\s*[A-Za-z0-9_]+)*(?:\s*\([^)]*\))?)\s*'?\s*=\s*(.+)$"
+    r"^([A-Za-z_][A-Za-z0-9_]*(?:\s*:\s*[A-Za-z0-9_]+)*(?:\s*\([^)]*\))?)\s*'?\s*(=|\+=|-=)\s*(.+)$"
 )
 
 
@@ -103,7 +103,14 @@ def parse_line(line: LogicalLine) -> Node:
 
     assignment = _ASSIGN_RE.match(text)
     if assignment:
-        return Assignment(line.span, _compact(assignment.group(1)), assignment.group(2).strip())
+        target = _compact(assignment.group(1))
+        operator = assignment.group(2)
+        expression = assignment.group(3).strip()
+        if operator == "+=":
+            expression = f"{target} + ({expression})"
+        elif operator == "-=":
+            expression = f"{target} - ({expression})"
+        return Assignment(line.span, target, expression)
 
     name, args = _split_head_args(text, line.span)
     return Command(line.span, name.upper(), args)

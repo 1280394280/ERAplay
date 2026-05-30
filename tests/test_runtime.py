@@ -279,6 +279,25 @@ ENDIF
     assert result.console.visible_text() == "nested"
 
 
+def test_runtime_executes_compound_assignment(tmp_path: Path) -> None:
+    (tmp_path / "main.erb").write_text(
+        """
+@EVENTFIRST
+TFLAG:100 = 1
+TFLAG:100 += 2
+TFLAG:100 -= 1
+PRINTV TFLAG:100
+""",
+        encoding="utf-8",
+    )
+    project = load_project(tmp_path)
+
+    result = run_project(project)
+
+    assert result.state.variables["TFLAG:100"] == 2
+    assert result.console.visible_text() == "2"
+
+
 def test_runtime_evaluates_parenthesized_and_condition(tmp_path: Path) -> None:
     (tmp_path / "main.erb").write_text(
         """

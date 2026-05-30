@@ -182,3 +182,14 @@ ENDIF
 
     assert isinstance(program.nodes[3], ElseIfBlock)
     assert program.nodes[3].condition == "RESULT == 1"
+
+
+def test_parse_compound_assignment_as_assignment() -> None:
+    program = parse_source("TFLAG:100 += 1\nLOCAL -= 2")
+
+    assert isinstance(program.nodes[0], Assignment)
+    assert program.nodes[0].target == "TFLAG:100"
+    assert program.nodes[0].expression == "TFLAG:100 + (1)"
+    assert isinstance(program.nodes[1], Assignment)
+    assert program.nodes[1].target == "LOCAL"
+    assert program.nodes[1].expression == "LOCAL - (2)"
